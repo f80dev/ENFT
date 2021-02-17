@@ -1,0 +1,26 @@
+[package]
+name = "e-non-fungible-tokens-wasm"
+version = "0.0.0"
+edition = "2018"
+
+[lib]
+crate-type = [ "cdylib",]
+
+[workspace]
+members = ["."]
+
+[profile.release]
+codegen-units = 1
+opt-level = "z"
+lto = true
+debug = false
+panic = "abort"
+
+[dependencies.e-non-fungible-tokens]
+features = [ "wasm-output-mode",]
+default-features = false
+path = ".."
+
+[dependencies.elrond-wasm-output]
+version = "0.11.0"
+features = [ "wasm-output-mode",]
