@@ -1,3 +1,5 @@
+#Ensemble de scripts de test du contrats
+
 #sed 's/\r$//' snippets.sh
 #cd /home/root/dev
 #erdpy contract build

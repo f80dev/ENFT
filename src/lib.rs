@@ -72,6 +72,7 @@ pub trait ENonFungibleTokens {
 
 		Ok(())
 	}
+	
 
 	// fn decrypt(&self, encrypted:&Vec<u8>) -> Vec<u8> {
 	// 	let a:u8=12;
