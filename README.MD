@@ -1,5 +1,5 @@
-#Extended-NFT
-##Principes
+# Extended-NFT
+## Principes
 Le principe des Extended-Non-Fongible-Token est détendre les fonctions des NFT en ajoutant 
 * la gestion d'un prix de vente et les reversements associés
 * la gestion des revendeurs et le versement des commissions associées (selon le principe d'un mandat de vente)
@@ -14,7 +14,7 @@ Cette gestion repose sur 3 types de comptes :
 Les 3 rôles sont cumulables.  
 Ainsi le mineur et de fait le premier propriétaire et il peut se déclarer comme vendeur.
     
-##Description d'un token
+## Description d'un token
 Chaque token dispose de plusieurs caractéristiques régissant son fonctionnement:
 * **price** est son prix initial, fixé par le mineur à sa création,
 * **uri** est une description publique du token, affichée dans la marketplace (le contenu peut désigner ressource IPFS),
@@ -28,8 +28,9 @@ Chaque token dispose de plusieurs caractéristiques régissant son fonctionnemen
 * **seller_owner** indique si le propriétaire est autorisé à mettre en vente et / ou transférer son token,
 * **miner_ratio** contient un pourcentage que percoit, à chaque vente, le mineur sur la commission du vendeur    
 
-##Usages
-Le SmartContract expose plusieurs méthodes:  
+## Usages
+Le SmartContract expose plusieurs méthodes pouvant être appelé par le distributeur, le propriétaire ou le mineur du token suivant la méthode considéré :
+  
 * **mint** : permet au mineur de fabriquer le token. La fabrication comprend notamment
 l'initialisation de certaines propriétés importantes comme le prix initial ou l'encadrement de la commission des distributeurs
 
