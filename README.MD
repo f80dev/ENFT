@@ -1,18 +1,21 @@
 # Extended-NFT
 ## Principes
 Le principe des Extended-Non-Fongible-Token est détendre les fonctions des NFT en ajoutant 
-* la gestion d'un prix de vente et les reversements associés
-* la gestion des revendeurs et le versement des commissions associées (selon le principe d'un mandat de vente)
-* la gestion d'un statut "en vente" permettant l'implémentation d'une marketplace
-* la possibilité de contenir de l'information uniquement destinée au propriétaire : secret
+* la gestion d'un prix de vente et les reversements associés,
+* la gestion des revendeurs et le versement des commissions associées (selon le principe d'un mandat de vente),
+* la gestion d'un statut "en vente" permettant l'implémentation d'une marketplace,
+* la possibilité de contenir de l'information uniquement destinée au propriétaire sous la forme d'un secret
 
-Cette gestion repose sur 3 types de comptes :
+Le fonctionnement général repose sur 3 types de profil :
 * Le "mineur", qui fabrique le token
-* le distributeur, qui peut vendre le token
-* le propriétaire du token
+* le "distributeur", qui dispose d'un mandat pour vendre le token sur sa propre place de marché,
+* le "propriétaire" du token
     
-Les 3 rôles sont cumulables.  
-Ainsi le mineur et de fait le premier propriétaire et il peut se déclarer comme vendeur.
+Les profils sont cumulables. Ainsi par exemple à la création du token, le "mineur" est également le "propriétaire".  
+Les distributeurs du token n'en sont pas propriétaires. Il dispose d'une autorisation (d'un mandat) qui est attribué par le propriétaire
+Lorsqu'un token est acheté, le nouveau propriétaire peut 
+* modifier la liste des distributeurs autorisés et remettre le token en vente,
+* l'offrir à quelqu'un
     
 ## Description d'un token
 Chaque token dispose de plusieurs caractéristiques régissant son fonctionnement:
@@ -53,7 +56,14 @@ pour recevoir sa commission. L'ancien propriétaire recoit le prix initial et le
 
 * **burn** est appelé par le mineur pour détruire un token
 
-##Evolutions
+## Remarques
+### Rétribution du propriétaire
+Le prix initial fixé à la création du token n'est jamais modifiable. 
+il détermine ce que reçoit le propriétaire lorsqu'il vend le token. 
+Si ce dernier souhaite faire une marge, il doit également se déclarer comme distributeur et fixer la commission qu'il souhaite recevoir
+
+
+## Evolutions prévues
 ENFT est encore en construction. Certaines évolutions doivent être mise en oeuvre avant d'être en version béta :
 * le secret doit être crypté à la fabrication du token par une clé connu du mineur et du contrat, 
 sinon il reste visible dans l'explorateur par analyse de la transaction
