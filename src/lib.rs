@@ -83,6 +83,7 @@ pub trait ENonFungibleTokens {
 	// }
 
 
+
 	#[endpoint]
 	fn open(&self, token_id: u64) -> SCResult<Vec<u8>> {
 		require!(token_id < self.get_total_minted(), "Token does not exist!");
@@ -90,17 +91,14 @@ pub trait ENonFungibleTokens {
 		let caller = self.get_caller();
 
 		let token=self.get_token(token_id);
+
 		let secret=token.secret.to_vec();
+		//TODO: mettre en place le décryptage du secret
 		//secret=self.decrypt(&secret);
 
 
 		if caller == token.owner {
 			return Ok(secret);
-		} else if !self.approval_is_empty(token_id) {
-			let approved_address = self.get_approval(token_id);
-			if caller == approved_address {
-				return Ok(secret);
-			}
 		}
 
 		sc_error!("You are not the owner of this token")
@@ -113,6 +111,7 @@ pub trait ENonFungibleTokens {
 		require!(token_id < self.get_total_minted(), "Token does not exist!");
 		let mut token=self.get_token(token_id);
 
+		//Le mineur peut avoir limité la possibilité de transfert du token à sa création
 		require!(token.seller_owner==1 || token.seller_owner==3,"Ce token ne peut être offert");
 
 		let caller = self.get_caller();
@@ -123,6 +122,7 @@ pub trait ENonFungibleTokens {
 			//self.perform_transfer(token_id, &token.owner, &to);
 			return Ok(());
 		} else if !self.approval_is_empty(token_id) {
+			//TODO code à conformer à ENFT
 			let approved_address = self.get_approval(token_id);
 
 			if caller == approved_address {
@@ -140,7 +140,8 @@ pub trait ENonFungibleTokens {
 
 
 
-	// private methods
+	// Méthode privée utilisé pour effectivement créer le token
+	//count permet de miner plusieurs tokens identique avec un seul appels
 	fn perform_mint(&self, count:u64,
 					new_token_owner: Address,
 					new_token_uri: &Vec<u8>,
@@ -188,25 +189,25 @@ pub trait ENonFungibleTokens {
 	}
 
 
+	//Fonction obsolete appelée dans le cadre de la norme ERC721
+	// fn perform_transfer(&self, token_id: u64, from: &Address, to: &Address) {
+	// 	let prev_owner_token_count = self.get_token_count(from);
+	// 	let new_owner_token_count = self.get_token_count(to);
+	//
+	// 	// new ownership revokes approvals by previous owner
+	// 	self.perform_revoke_approval(token_id);
+	//
+	// 	self.set_token_count(from, prev_owner_token_count - 1);
+	// 	self.set_token_count(to, new_owner_token_count + 1);
+	//
+	// 	let mut token=self.get_token(token_id);
+	// 	token.owner=to.clone();
+	// 	self.set_token(token_id, &token);
+	//
+	// }
 
-	fn perform_transfer(&self, token_id: u64, from: &Address, to: &Address) {
-		let prev_owner_token_count = self.get_token_count(from);
-		let new_owner_token_count = self.get_token_count(to);
 
-		// new ownership revokes approvals by previous owner
-		self.perform_revoke_approval(token_id);
-
-		self.set_token_count(from, prev_owner_token_count - 1);
-		self.set_token_count(to, new_owner_token_count + 1);
-
-		let mut token=self.get_token(token_id);
-		token.owner=to.clone();
-		self.set_token(token_id, &token);
-
-	}
-
-
-	// Transfer ownership of the token to a new account.
+	//Détruit un token en lui affectant l'adresse 0x0 comme propriétaire et mineur
 	#[endpoint]
 	fn burn(&self, token_id: u64) -> SCResult<()> {
 		require!(token_id < self.get_total_minted(), "Token does not exist!");
@@ -225,6 +226,7 @@ pub trait ENonFungibleTokens {
 	}
 
 
+	//Permet la mise en vente ou le retrait de la vente d'un token
 	//Seul le propriétaire du token peut le remettre en vente
 	#[endpoint]
 	fn setstate(&self,  token_id: u64,new_state:u8) -> SCResult<()> {
@@ -243,6 +245,8 @@ pub trait ENonFungibleTokens {
 
 
 
+	//Permet d'ajouter un distributeur à la liste des distributeurs du token
+	//Cette fonction est réservé au propriétaire du token
 	#[endpoint]
 	fn add_dealer(&self,  token_id: u64, addr: Address) -> SCResult<()> {
 		let caller=self.get_caller();
@@ -260,6 +264,8 @@ pub trait ENonFungibleTokens {
 		Ok(())
 	}
 
+
+	//efface l'ensemble des distributeurs
 	#[endpoint]
 	fn clear_dealer(&self,  token_id: u64) -> SCResult<()> {
 		let mut token = self.get_token(token_id);
@@ -298,15 +304,6 @@ pub trait ENonFungibleTokens {
 		self.set_token(token_id,&token);
 
 		return Ok(())
-	}
-
-
-	fn vector_as_u8_8_array(&self,vector: Vec<u8>) -> [u8;8] {
-		let mut arr = [0u8;8];
-		for (place, element) in arr.iter_mut().zip(vector.iter()) {
-			*place = *element;
-		}
-		arr
 	}
 
 
@@ -352,7 +349,6 @@ pub trait ENonFungibleTokens {
 			}
 
 			//Transaction issue d'un revendeur
-
 			self.send().direct_egld(
 				&token.dealer_addr[idx],
 				&BigUint::from(payment_for_dealer),
@@ -399,7 +395,7 @@ pub trait ENonFungibleTokens {
 				&& (seller_filter == Address::zero() || idx<1000) {
 				let mut item:Vec<u8>=Vec::new();
 
-				//On commence par inscrire la taille de token_price, uri
+				//On commence par inscrire la taille de token_price & uri dont les tailles dépendent du contenu
 				//doc sur le conversion :https://docs.rs/elrond-wasm/0.10.3/elrond_wasm/
 				item.append(&mut token.uri.len().to_be_bytes().to_vec());
 
@@ -442,12 +438,13 @@ pub trait ENonFungibleTokens {
 	// fn set_token_owner(&self, token_id: u64, owner: &Address);
 
 
+	//Retourne le nombre total de token minés
 	#[view(totalMinted)]
 	#[storage_get("totalMinted")]
 	fn get_total_minted(&self) -> u64;
-
 	#[storage_set("totalMinted")]
 	fn set_total_minted(&self, total_minted: u64);
+
 
 
 	#[view(tokenCount)]
@@ -473,9 +470,11 @@ pub trait ENonFungibleTokens {
 	fn get_approval(&self, token_id: u64) -> Address;
 	#[storage_set("approval")]
 	fn set_approval(&self, token_id: u64, approved_address: &Address);
+	#[storage_clear("approval")]
+	fn clear_approval(&self, token_id: u64);
 
 
-
+	//Anciennes fonctions NFT, obsolètes dans la structure actuelle le miner étant stoker dans la structure du token
 	// #[view(tokenMiner)]
 	// #[storage_get("tokenMiner")]
 	// fn get_token_miner(&self, token_id: u64) -> Address;
@@ -483,6 +482,5 @@ pub trait ENonFungibleTokens {
 	// fn set_token_miner(&self, token_id: u64, miner_address: &Address);
 
 
-	#[storage_clear("approval")]
-	fn clear_approval(&self, token_id: u64);
+
 }

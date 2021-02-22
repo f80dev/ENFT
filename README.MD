@@ -44,6 +44,7 @@ pour recevoir sa commission. L'ancien propriétaire recoit le prix initial et le
 * **setstate** permet au propriétaire de mettre en vente / retirer de la vente le token qu'il posséde
 
 * **add_dealer** permet au propriétaire d'ajouter un distributeur au token
+* **clear_dealer** retire l'ensemble des distributeurs
 
 * **price** est appelé par le distributeur pour modifier sa commission (dans l'interval fixé à la création du token par le mineur)
 
@@ -58,6 +59,8 @@ sinon il reste visible dans l'explorateur par analyse de la transaction
 * certaines fonctions doivent être ajoutée afin de garantir la compatibilité avec ERC721
 * quelques optimisations sont à étudier notamment autour de la consommation de gas à l'achat des tokens : sortir le propriétaire de la structure
 du token pour miniser l'impact d'un changement de propriétaire (vente et transfert du token) 
+* permettre l'usage d'ESDT à la place de l'eGold
+* mettre en place la possibilité d'une destruction automatique du token après ouverture
 
 
 
