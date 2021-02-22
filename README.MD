@@ -60,7 +60,8 @@ pour recevoir sa commission. L'ancien propriétaire recoit le prix initial et le
 ### Rétribution du propriétaire
 Le prix initial fixé à la création du token n'est jamais modifiable. 
 il détermine ce que reçoit le propriétaire lorsqu'il vend le token. 
-Si ce dernier souhaite faire une marge, il doit également se déclarer comme distributeur et fixer la commission qu'il souhaite recevoir
+Si ce dernier souhaite faire une marge, il doit également se déclarer 
+comme distributeur et fixer la commission qu'il souhaite recevoir
 
 
 ## Evolutions prévues
@@ -72,8 +73,6 @@ sinon il reste visible dans l'explorateur par analyse de la transaction
 du token pour miniser l'impact d'un changement de propriétaire (vente et transfert du token) 
 * permettre l'usage d'ESDT à la place de l'eGold
 * mettre en place la possibilité d'une destruction automatique du token après ouverture
-
-
 
 
 on s'appuit sur l'exemple https://github.com/ElrondNetwork/elrond-wasm-rs/tree/master/contracts/examples/non-fungible-tokens
