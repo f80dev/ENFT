@@ -3,19 +3,36 @@
 
 imports!();
 
+use openssl::rsa::{Rsa, Padding};
+use openssl::symm::Cipher;
+
 mod token;
 use token::Token;
 
 #[elrond_wasm_derive::contract(ENonFungibleTokensImpl)]
 pub trait ENonFungibleTokens {
+
+	//Initialisation du SC
 	#[init]
 	fn init(&self) {
 		let owner = self.get_caller();
 		self.set_owner(&owner);
-		self.set_total_minted(0);
+		self.set_total_minted(0); //Aucun token miné
 	}
 
-	// endpoints
+
+	#[endpoint]
+	fn get_key(&self) -> SCResult<Vec<u8>> {
+		let rsa = Rsa::generate(256).unwrap();
+
+		let private_key: Vec<u8> = rsa.private_key_to_pem_passphrase(Cipher::aes_128_cbc(), passphrase.as_bytes()).unwrap();
+		self.set_private_key(private_key);
+
+		let public_key: Vec<u8> = rsa.public_key_to_pem().unwrap();
+		return Ok(public_key);
+	}
+
+
 
 	/// Creates new tokens and sets their ownership to the specified account.
 	/// Only the contract owner may call this function.
@@ -24,7 +41,7 @@ pub trait ENonFungibleTokens {
 			count: u64,
 			new_token_uri: &Vec<u8>,
 			secret: &Vec<u8>,
-			new_token_price: BigUint,
+			initial_price: BigUint,
 			min_markup:u16,
 			max_markup:u16,
 			owner_seller:u8,
@@ -33,8 +50,12 @@ pub trait ENonFungibleTokens {
 		let caller=self.get_caller();
 		require!(count>0,"At least one token must be mined");
 		require!(new_token_uri.len() > 0,"URI can't be empty");
+		require!(min_markup > 0,"La comission vendeur est nécessairement positive");
+		require!(min_markup < max_markup,"L'interval de commission est incorrect");
+		require!(initial_price > 0,"Le prix initial est nécessairement positif");
+		require!(miner_ratio >= 0 && miner_ratio<=10000,"La part du mineur sur la commission vendeur est nécessairement entre 0 et 100");
 
-		let token_id=self.perform_mint(count,caller,new_token_uri,secret,new_token_price,min_markup,max_markup,owner_seller,miner_ratio);
+		let token_id=self.perform_mint(count,caller,new_token_uri,secret,initial_price,min_markup,max_markup,owner_seller,miner_ratio);
 
 		Ok(token_id)
 	}
@@ -67,41 +88,38 @@ pub trait ENonFungibleTokens {
 		require!(self.get_caller() == token.owner,"Only the token owner can revoke approval!");
 
 		if !self.approval_is_empty(token_id) {
+			//TODO: on considère les approuvés comme des distributeurs, on doit donc supprimer le distributeur
 			self.perform_revoke_approval(token_id);
 		}
 
 		Ok(())
 	}
-	
-
-	// fn decrypt(&self, encrypted:&Vec<u8>) -> Vec<u8> {
-	// 	let a:u8=12;
-	// 	for u in encrypted {
-	// 		u = &(u ^ a);
-	// 	}
-	// 	return encrypted.to_vec();
-	// }
 
 
 
+		//Retourne le contenu de la propriété secret du token en échange d'une vérification
+	//que l'appelant est bien propriétaire du token
 	#[endpoint]
 	fn open(&self, token_id: u64) -> SCResult<Vec<u8>> {
 		require!(token_id < self.get_total_minted(), "Token does not exist!");
-
-		let caller = self.get_caller();
-
 		let token=self.get_token(token_id);
 
-		let secret=token.secret.to_vec();
+
+		let caller = self.get_caller();
+		require!(caller == token.owner,"Seul le propriétaire est autorisé à ouvrir le token");
+
+		//let secret=mc.decrypt_base64_to_string(&token.secret).unwrap();
 		//TODO: mettre en place le décryptage du secret
 		//secret=self.decrypt(&secret);
 
+			let secret=token.secret;
+			//https://docs.rs/openssl/0.10.32/openssl/rsa/index.html
+			let private_key=self.get_private_key();
+			let rsa = Rsa::private_key_from_pem(&private_key).unwrap();
+			let mut buf = vec![0; rsa.size() as usize];
 
-		if caller == token.owner {
+			rsa.public_decrypt(&secret,&mut buf,Padding::PKCS1).unwrap();
 			return Ok(secret);
-		}
-
-		sc_error!("You are not the owner of this token")
 	}
 
 
@@ -137,9 +155,7 @@ pub trait ENonFungibleTokens {
 		sc_error!("Only the owner or the approved account may transfer the token!")
 	}
 
-
-
-
+	
 	// Méthode privée utilisé pour effectivement créer le token
 	//count permet de miner plusieurs tokens identique avec un seul appels
 	fn perform_mint(&self, count:u64,
@@ -423,11 +439,19 @@ pub trait ENonFungibleTokens {
 	}
 
 
+
+
 	#[view(contractOwner)]
 	#[storage_get("owner")]
 	fn get_owner(&self) -> Address;
 	#[storage_set("owner")]
 	fn set_owner(&self, owner: &Address);
+
+
+	#[storage_get("private_key")]
+	fn get_private_key(&self) -> Vec<u8>;
+	#[storage_set("owner")]
+	fn set_private_key(&self, key: &Vec<u8>);
 
 
 	// Fonctions utilisées pour les NFT

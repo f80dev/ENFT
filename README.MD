@@ -3,8 +3,8 @@
 Le principe des Extended-Non-Fongible-Token est détendre les fonctions des NFT en ajoutant 
 * la gestion d'un prix de vente et les reversements associés,
 * la gestion des revendeurs et le versement des commissions associées (selon le principe d'un mandat de vente),
-* la gestion d'un statut "en vente" permettant l'implémentation d'une marketplace,
-* la possibilité de contenir de l'information uniquement destinée au propriétaire sous la forme d'un secret
+* la gestion d'un statut "en vente" pour le token et l'implémentation d'une méthode de vente destinée aux distributeur, simplifiant ainsi l'implémentation d'une marketplace,
+* la possibilité de'embarquer dans le token de l'information uniquement visualisable par le propriétaire sous la forme d'un secret
 
 Le fonctionnement général repose sur 3 types de profil :
 * Le "mineur", qui fabrique le token
@@ -32,7 +32,8 @@ Chaque token dispose de plusieurs caractéristiques régissant son fonctionnemen
 * **miner_ratio** contient un pourcentage que percoit, à chaque vente, le mineur sur la commission du vendeur    
 
 ## Usages
-Le SmartContract expose plusieurs méthodes pouvant être appelé par le distributeur, le propriétaire ou le mineur du token suivant la méthode considéré :
+Le SmartContract expose plusieurs méthodes pouvant être appelé par le distributeur, 
+le propriétaire ou le mineur du token suivant la méthode considéré :
   
 * **mint** : permet au mineur de fabriquer le token. La fabrication comprend notamment
 l'initialisation de certaines propriétés importantes comme le prix initial ou l'encadrement de la commission des distributeurs
@@ -56,12 +57,26 @@ pour recevoir sa commission. L'ancien propriétaire recoit le prix initial et le
 
 * **burn** est appelé par le mineur pour détruire un token
 
+
 ## Remarques
 ### Rétribution du propriétaire
-Le prix initial fixé à la création du token n'est jamais modifiable. 
+Le prix initial, fixé à la création du token, n'est jamais modifiable. 
 il détermine ce que reçoit le propriétaire lorsqu'il vend le token. 
 Si ce dernier souhaite faire une marge, il doit également se déclarer 
 comme distributeur et fixer la commission qu'il souhaite recevoir
+### Gestion du secret
+La gestion d'un secret implique d'utiliser une fonction de cryptage pour protéger la transmission du secret au
+moment du minage du token (la transaction étant publique et consultable via l'explorateur Elrond).
+
+On utilise l'algorithme de cryptage asymétrique RSA. Avant le minage d'un token, l'application 
+demande une clé publique au smartcontract, crypte le secret et appele la fonctionnalité de minage avec le secret crypté comme paramètre.
+
+Lors de l'ouverture du token par le propriétaire, le SmartContract 
+*  vérifie que l'appelant est bien le propriétaire du token,
+*  décripte le secret avec sa clé privée de décryptage
+*  retourne le secret du token décrypté
+
+
 
 
 ## Evolutions prévues
