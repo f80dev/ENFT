@@ -75,7 +75,7 @@ Lors de l'ouverture du token par le propriétaire, le SmartContract
 *  vérifie que l'appelant est bien le propriétaire du token,
 *  décripte le secret avec sa clé privée de décryptage
 *  retourne le secret du token décrypté
-
+via la méthode Open
 
 
 
