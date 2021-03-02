@@ -1,10 +1,10 @@
+//GNU GENERAL PUBLIC LICENSE - Version 3, 29 June 2007
+//Auteur: Herve Hoareau
+
 #![no_std]
 #![allow(clippy::too_many_arguments)]
 
 imports!();
-
-use openssl::rsa::{Rsa, Padding};
-use openssl::symm::Cipher;
 
 mod token;
 use token::Token;
@@ -21,16 +21,18 @@ pub trait ENonFungibleTokens {
 	}
 
 
-	#[endpoint]
-	fn get_key(&self) -> SCResult<Vec<u8>> {
-		let rsa = Rsa::generate(256).unwrap();
-
-		let private_key: Vec<u8> = rsa.private_key_to_pem_passphrase(Cipher::aes_128_cbc(), passphrase.as_bytes()).unwrap();
-		self.set_private_key(private_key);
-
-		let public_key: Vec<u8> = rsa.public_key_to_pem().unwrap();
-		return Ok(public_key);
-	}
+	//Fonction utilisé dans le processus de cryptage, non utilisé à date
+	// #[endpoint]
+	// fn get_key(&self) -> SCResult<Vec<u8>> {
+	// 	let mut rng = OsRng;
+	// 	let bits = 2048;
+	// 	let private_key = RSAPrivateKey::new(&mut rng, bits).expect("failed to generate a key");
+	// 	let public_key = RSAPublicKey::from(&private_key);
+	//
+	// 	self.set_private_key(&private_key);
+	//
+	// 	return Ok(public_key.gen_bigint(&bits));
+	// }
 
 
 
@@ -50,9 +52,9 @@ pub trait ENonFungibleTokens {
 		let caller=self.get_caller();
 		require!(count>0,"At least one token must be mined");
 		require!(new_token_uri.len() > 0,"URI can't be empty");
-		require!(min_markup > 0,"La comission vendeur est nécessairement positive");
-		require!(min_markup < max_markup,"L'interval de commission est incorrect");
-		require!(initial_price > 0,"Le prix initial est nécessairement positif");
+		require!(min_markup >= 0,"La comission vendeur est nécessairement positive");
+		require!(min_markup <= max_markup,"L'interval de commission est incorrect");
+		require!(initial_price >= 0,"Le prix initial est nécessairement positif");
 		require!(miner_ratio >= 0 && miner_ratio<=10000,"La part du mineur sur la commission vendeur est nécessairement entre 0 et 100");
 
 		let token_id=self.perform_mint(count,caller,new_token_uri,secret,initial_price,min_markup,max_markup,owner_seller,miner_ratio);
@@ -114,11 +116,8 @@ pub trait ENonFungibleTokens {
 
 			let secret=token.secret;
 			//https://docs.rs/openssl/0.10.32/openssl/rsa/index.html
-			let private_key=self.get_private_key();
-			let rsa = Rsa::private_key_from_pem(&private_key).unwrap();
-			let mut buf = vec![0; rsa.size() as usize];
+			//let secret=v3::decrypt("secret",&enc_data);
 
-			rsa.public_decrypt(&secret,&mut buf,Padding::PKCS1).unwrap();
 			return Ok(secret);
 	}
 
@@ -448,10 +447,10 @@ pub trait ENonFungibleTokens {
 	fn set_owner(&self, owner: &Address);
 
 
-	#[storage_get("private_key")]
-	fn get_private_key(&self) -> Vec<u8>;
-	#[storage_set("owner")]
-	fn set_private_key(&self, key: &Vec<u8>);
+	// #[storage_get("private_key")]
+	// fn get_private_key(&self) -> RSAPrivateKey;
+	// #[storage_set("owner")]
+	// fn set_private_key(&self, key: &RSAPrivateKey);
 
 
 	// Fonctions utilisées pour les NFT
