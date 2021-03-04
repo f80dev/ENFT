@@ -408,7 +408,7 @@ pub trait ENonFungibleTokens {
 
 			if (owner_filter == Address::zero() || owner_filter == token.owner)
 				&& (miner_filter == Address::zero() || miner_filter == token.miner)
-				&& ((seller_filter == Address::zero() && token.properties & 0b00000100 > 0) || idx<1000) {
+				&& (seller_filter == Address::zero() || idx<1000) {
 				let mut item:Vec<u8>=Vec::new();
 
 				//On commence par inscrire la taille de token_price & uri dont les tailles dépendent du contenu
