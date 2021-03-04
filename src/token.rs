@@ -20,12 +20,12 @@ pub struct Token<BigUint: BigUintApi> {
      pub owner:Address,
      pub miner:Address,
 
-     pub seller_owner:u8,
+     //properties est stoké sur 8 bits : 00000<vente directe possible><le propriétaire peut vendre><le propriétaire peut offrir>
+     pub properties:u8,
      pub miner_ratio:u16
 }
 
-//seller_owner=1 ou 3:le propriétaire peut offrir
-//seller_owner=2 ou 3:le propriétaire peut vendre
+
 
 
 

@@ -46,18 +46,18 @@ pub trait ENonFungibleTokens {
 			initial_price: BigUint,
 			min_markup:u16,
 			max_markup:u16,
-			owner_seller:u8,
+			properties:u8,
 			miner_ratio:u16
 	) -> SCResult<u64> {
 		let caller=self.get_caller();
 		require!(count>0,"At least one token must be mined");
 		require!(new_token_uri.len() > 0,"URI can't be empty");
-		require!(min_markup >= 0,"La comission vendeur est nécessairement positive");
 		require!(min_markup <= max_markup,"L'interval de commission est incorrect");
 		require!(initial_price >= 0,"Le prix initial est nécessairement positif");
-		require!(miner_ratio >= 0 && miner_ratio<=10000,"La part du mineur sur la commission vendeur est nécessairement entre 0 et 100");
+		//La limite du miner_ratio est à 10000 car on multiplie par 100 pour autoriser un pourcentage à 2 décimal
+		require!(miner_ratio<=10000,"La part du mineur sur la commission vendeur est nécessairement entre 0 et 100");
 
-		let token_id=self.perform_mint(count,caller,new_token_uri,secret,initial_price,min_markup,max_markup,owner_seller,miner_ratio);
+		let token_id=self.perform_mint(count,caller,new_token_uri,secret,initial_price,min_markup,max_markup,properties,miner_ratio);
 
 		Ok(token_id)
 	}
@@ -129,7 +129,7 @@ pub trait ENonFungibleTokens {
 		let mut token=self.get_token(token_id);
 
 		//Le mineur peut avoir limité la possibilité de transfert du token à sa création
-		require!(token.seller_owner==1 || token.seller_owner==3,"Ce token ne peut être offert");
+		require!(token.properties & 0b00000001 > 0,"Ce token ne peut être offert");
 
 		let caller = self.get_caller();
 
@@ -163,7 +163,7 @@ pub trait ENonFungibleTokens {
 					secret: &Vec<u8>,
 					new_token_price: BigUint,
 					min_markup: u16,max_markup: u16,
-					owner_seller:u8,
+					properties:u8,
 					miner_ratio:u16) -> u64 {
 		let new_owner_current_total = self.get_token_count(&new_token_owner);
 		let total_minted = self.get_total_minted();
@@ -182,7 +182,7 @@ pub trait ENonFungibleTokens {
 				max_markup:max_markup,
 				dealer_addr:Vec::new(),
 				dealer_markup:Vec::new(),
-				seller_owner:owner_seller,
+				properties:properties,
 				miner_ratio:miner_ratio,
 			};
 
@@ -250,7 +250,7 @@ pub trait ENonFungibleTokens {
 
 		require!(token_id < self.get_total_minted(), "Token does not exist!");
 		require!(token.owner == caller,"Only token owner or reseller can change the state");
-		require!(token.seller_owner==2 || token.seller_owner==3,"Le créateur du token n'autorise pas le propriétaire à le vendre");
+		require!(token.properties & 0b00000010>0,"Le créateur du token n'autorise pas le propriétaire à le vendre");
 
 		token.state=new_state;
 		self.set_token(token_id,&token);
@@ -330,7 +330,7 @@ pub trait ENonFungibleTokens {
 	#[endpoint]
 	fn buy(&self, #[payment] payment: BigUint, token_id: u64,dealer:Address) -> SCResult<&str> {
 
-		require!(token_id < self.get_total_minted(), "Token does not exist!");
+		require!(token_id < self.get_total_minted(), "Ce token n'existe pas");
 
 		let mut token = self.get_token(token_id);
 		let caller=self.get_caller();
@@ -344,6 +344,7 @@ pub trait ENonFungibleTokens {
 			payment_for_dealer=10000000000000000*token.dealer_markup[idx] as u64;
 		}
 
+		require!(token.properties & 0b00000100>0 || dealer!=Address::zero() ,"La vente directe n'est pas autorisé");
 		require!(dealer==Address::zero() || idx<1000 ,"Le revendeur n'est pas autorisé");
 		require!(payment >= token.price.clone()+BigUint::from(payment_for_dealer),"Montant inferieur au prix");
 
@@ -407,7 +408,7 @@ pub trait ENonFungibleTokens {
 
 			if (owner_filter == Address::zero() || owner_filter == token.owner)
 				&& (miner_filter == Address::zero() || miner_filter == token.miner)
-				&& (seller_filter == Address::zero() || idx<1000) {
+				&& ((seller_filter == Address::zero() && token.properties & 0b00000100 > 0) || idx<1000) {
 				let mut item:Vec<u8>=Vec::new();
 
 				//On commence par inscrire la taille de token_price & uri dont les tailles dépendent du contenu
@@ -424,7 +425,7 @@ pub trait ENonFungibleTokens {
 				item.append(&mut price.to_bytes_be_pad_right(10).unwrap_or(Vec::new()));
 				item.append(&mut token.owner.to_vec());
 				item.push(token.state);
-				item.push(token.seller_owner);
+				item.push(token.properties);
 				item.append(&mut token.min_markup.to_be_bytes().to_vec());
 				item.append(&mut token.max_markup.to_be_bytes().to_vec());
 				item.append(&mut i.to_be_bytes().to_vec());

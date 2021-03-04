@@ -23,6 +23,3 @@ optional = true
 
 [dev-dependencies.elrond-wasm-debug]
 version = "0.12.0"
-
-[dependencies.short-crypt]
-version = "1.0.23"

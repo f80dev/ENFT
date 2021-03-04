@@ -28,7 +28,7 @@ Chaque token dispose de plusieurs caractéristiques régissant son fonctionnemen
 * **min_markup** & **max_markup** fixe les limites des commissions que les distributeurs peuvent fixer
 * **owner** contient l'adresse Elrond du propriétaire du token
 * **miner** contient l'adresse Elrond du mineur (créateur) du token
-* **seller_owner** indique si le propriétaire est autorisé à mettre en vente et / ou transférer son token,
+* **properties** indique si le propriétaire est autorisé à mettre en vente et / ou transférer son token,
 * **miner_ratio** contient un pourcentage que percoit, à chaque vente, le mineur sur la commission du vendeur    
 
 ## Usages
