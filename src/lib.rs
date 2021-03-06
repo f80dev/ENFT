@@ -103,16 +103,17 @@ pub trait ENonFungibleTokens {
 	//que l'appelant est bien propriétaire du token
 	#[endpoint]
 	fn open(&self, token_id: u64) -> SCResult<Vec<u8>> {
-		require!(token_id < self.get_total_minted(), "Token does not exist!");
-		let token=self.get_token(token_id);
+			require!(token_id < self.get_total_minted(), "Token does not exist!");
+			let token=self.get_token(token_id);
 
 
-		let caller = self.get_caller();
-		require!(caller == token.owner,"Seul le propriétaire est autorisé à ouvrir le token");
+			let caller = self.get_caller();
+			require!(caller == token.owner,"Seul le propriétaire est autorisé à ouvrir le token");
+			require!(token.secret.len()>0,"Ce token ne contient pas de secret");
 
-		//let secret=mc.decrypt_base64_to_string(&token.secret).unwrap();
-		//TODO: mettre en place le décryptage du secret
-		//secret=self.decrypt(&secret);
+			//let secret=mc.decrypt_base64_to_string(&token.secret).unwrap();
+			//TODO: mettre en place le décryptage du secret
+			//secret=self.decrypt(&secret);
 
 			let secret=token.secret;
 			//https://docs.rs/openssl/0.10.32/openssl/rsa/index.html
@@ -428,6 +429,7 @@ pub trait ENonFungibleTokens {
 				item.push(token.properties);
 				item.append(&mut token.min_markup.to_be_bytes().to_vec());
 				item.append(&mut token.max_markup.to_be_bytes().to_vec());
+				item.append(&mut token.miner_ratio.to_be_bytes().to_vec());
 				item.append(&mut i.to_be_bytes().to_vec());
 				item.append(&mut token.uri);
 
