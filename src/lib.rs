@@ -171,11 +171,13 @@ pub trait ENonFungibleTokens {
 		let first_new_id = total_minted;
 		let last_new_id = total_minted + count;
 
+
 		for id in first_new_id..last_new_id {
 			let token = Token {
 				owner:new_token_owner.clone(),
 				miner:new_token_owner.clone(),
 				price:new_token_price.clone(),
+				gift:0u16,
 				uri:new_token_uri.to_vec(),
 				secret:secret.to_vec(),
 				state:0 as u8,
@@ -352,7 +354,6 @@ pub trait ENonFungibleTokens {
 		//Versement au vendeur
 		let payment_for_owner=payment.clone()-BigUint::from(payment_for_dealer);
 
-
 		if dealer!=Address::zero() && payment_for_dealer>0 {
 			//On retribue le mineur sur la commission du distributeur
 			if token.miner_ratio>0 {
@@ -419,16 +420,23 @@ pub trait ENonFungibleTokens {
 				//Puis on ajoute l'ensemble des informations d'un token
 				//dans un vecteur d'octets
 				let mut price=token.price;
+				let mut markup=0u16;
 				if idx<1000 {
 					price=price+BigUint::from(10000000000000000*token.dealer_markup[idx] as u64);
+					markup=token.dealer_markup[idx];
 				}
+
+				let mut has_secret=0u8;
+				if token.secret.len()>0 {has_secret=1u8;}
 
 				item.append(&mut price.to_bytes_be_pad_right(10).unwrap_or(Vec::new()));
 				item.append(&mut token.owner.to_vec());
+				item.push(has_secret);
 				item.push(token.state);
 				item.push(token.properties);
 				item.append(&mut token.min_markup.to_be_bytes().to_vec());
 				item.append(&mut token.max_markup.to_be_bytes().to_vec());
+				item.append(&mut markup.to_be_bytes().to_vec());
 				item.append(&mut token.miner_ratio.to_be_bytes().to_vec());
 				item.append(&mut i.to_be_bytes().to_vec());
 				item.append(&mut token.uri);

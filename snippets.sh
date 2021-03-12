@@ -11,7 +11,7 @@ PROJECT="."
 
 ALICE="${USERS}/alice.pem"
 BOB="${USERS}/bob.pem"
-DAN="${USERS}/dan.pem"
+DAN="${USERS}/dan.epem"
 CAROL="${USERS}/carol.pem"
 ADDRESS=$(erdpy data load --key=address)
 DEPLOY_TRANSACTION=$(erdpy data load --key=deployTransaction)

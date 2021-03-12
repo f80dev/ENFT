@@ -9,6 +9,7 @@ pub struct Token<BigUint: BigUintApi> {
      pub price: BigUint,
      pub uri: Vec<u8>,
      pub secret:Vec<u8>,
+     pub gift:u16,
      pub state:u8,
 
      pub dealer_addr:Vec<Address>,
