@@ -357,9 +357,9 @@ pub trait ENonFungibleTokens {
 		if dealer!=Address::zero() && payment_for_dealer>0 {
 			//On retribue le mineur sur la commission du distributeur
 			if token.miner_ratio>0 {
-				let payment_for_miner=payment_for_dealer/(10000u64/token.miner_ratio as u64);
+				let payment_for_miner=1000000000000*token.dealer_markup[idx] as u64*token.miner_ratio as u64;
 				self.send().direct_egld(
-					&token.owner,
+					&token.miner,
 					&BigUint::from(payment_for_miner),
 					b"Reglement du miner"
 				);
