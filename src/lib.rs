@@ -349,7 +349,7 @@ pub trait ENonFungibleTokens {
 
 		require!(token.properties & 0b00000100>0 || dealer!=Address::zero() ,"La vente directe n'est pas autorisé");
 		require!(dealer==Address::zero() || idx<1000 ,"Le revendeur n'est pas autorisé");
-		require!(payment >= token.price.clone()+BigUint::from(payment_for_dealer),"Montant inferieur au prix");
+		require!(payment >= token.price.clone()+BigUint::from(payment_for_dealer),"Paiement inferieur au prix du token");
 
 		//Versement au vendeur
 		let payment_for_owner=payment.clone()-BigUint::from(payment_for_dealer);
