@@ -38,26 +38,30 @@ pub trait ENonFungibleTokens {
 
 	/// Creates new tokens and sets their ownership to the specified account.
 	/// Only the contract owner may call this function.
+	#[payable("EGLD")]
 	#[endpoint]
 	fn mint(&self,
+			#[payment] payment: BigUint,
 			count: u64,
 			new_token_uri: &Vec<u8>,
 			secret: &Vec<u8>,
-			initial_price: BigUint,
+			initial_price: u32,
 			min_markup:u16,
 			max_markup:u16,
 			properties:u8,
-			miner_ratio:u16
+			miner_ratio:u16,
+			gift:u16,
 	) -> SCResult<u64> {
 		let caller=self.get_caller();
 		require!(count>0,"At least one token must be mined");
 		require!(new_token_uri.len() > 0,"URI can't be empty");
 		require!(min_markup <= max_markup,"L'interval de commission est incorrect");
-		require!(initial_price >= 0,"Le prix initial est nécessairement positif");
+		//require!(initial_price >= 0,"Le prix initial est nécessairement positif");
 		//La limite du miner_ratio est à 10000 car on multiplie par 100 pour autoriser un pourcentage à 2 décimal
 		require!(miner_ratio<=10000,"La part du mineur sur la commission vendeur est nécessairement entre 0 et 100");
+		require!(payment>=BigUint::from(gift as u64),"Transfert de fond insuffisant pour le token");
 
-		let token_id=self.perform_mint(count,caller,new_token_uri,secret,initial_price,min_markup,max_markup,properties,miner_ratio);
+		let token_id=self.perform_mint(count,caller,new_token_uri,secret,initial_price,min_markup,max_markup,properties,miner_ratio,gift);
 
 		Ok(token_id)
 	}
@@ -104,7 +108,7 @@ pub trait ENonFungibleTokens {
 	#[endpoint]
 	fn open(&self, token_id: u64) -> SCResult<Vec<u8>> {
 			require!(token_id < self.get_total_minted(), "Token does not exist!");
-			let token=self.get_token(token_id);
+			let mut token=self.get_token(token_id);
 
 
 			let caller = self.get_caller();
@@ -115,9 +119,21 @@ pub trait ENonFungibleTokens {
 			//TODO: mettre en place le décryptage du secret
 			//secret=self.decrypt(&secret);
 
-			let secret=token.secret;
+			let secret=token.secret.clone();
 			//https://docs.rs/openssl/0.10.32/openssl/rsa/index.html
 			//let secret=v3::decrypt("secret",&enc_data);
+
+			if token.gift>0 {
+				self.send().direct_egld(
+					&token.owner,
+					&BigUint::from(token.gift as u64),
+					b"Paiement du proprietaire"
+				);
+				token.gift=0;
+				self.set_token(token_id,&token);
+			}
+
+
 
 			return Ok(secret);
 	}
@@ -162,22 +178,24 @@ pub trait ENonFungibleTokens {
 					new_token_owner: Address,
 					new_token_uri: &Vec<u8>,
 					secret: &Vec<u8>,
-					new_token_price: BigUint,
+					new_token_price: u32,
 					min_markup: u16,max_markup: u16,
 					properties:u8,
-					miner_ratio:u16) -> u64 {
+					miner_ratio:u16,
+					gift:u16) -> u64 {
 		let new_owner_current_total = self.get_token_count(&new_token_owner);
 		let total_minted = self.get_total_minted();
 		let first_new_id = total_minted;
 		let last_new_id = total_minted + count;
 
+		let mut g=gift.clone();
 
 		for id in first_new_id..last_new_id {
 			let token = Token {
 				owner:new_token_owner.clone(),
 				miner:new_token_owner.clone(),
 				price:new_token_price.clone(),
-				gift:0u16,
+				gift:g,
 				uri:new_token_uri.to_vec(),
 				secret:secret.to_vec(),
 				state:0 as u8,
@@ -190,6 +208,7 @@ pub trait ENonFungibleTokens {
 			};
 
 			self.set_token(id, &token);
+			g=0;
 		}
 
 		self.set_total_minted(total_minted + count);
@@ -334,11 +353,11 @@ pub trait ENonFungibleTokens {
 	fn buy(&self, #[payment] payment: BigUint, token_id: u64,dealer:Address) -> SCResult<&str> {
 
 		require!(token_id < self.get_total_minted(), "Ce token n'existe pas");
-
 		let mut token = self.get_token(token_id);
-		let caller=self.get_caller();
 
+		let caller=self.get_caller();
 		require!(token.owner != caller,"Ce token vous appartient déjà");
+
 		require!(token.state == 0,"Ce token n'est pas en vente");
 
 		let idx = token.dealer_addr.iter().position(|x| x == &dealer).unwrap_or(1000);
@@ -349,7 +368,7 @@ pub trait ENonFungibleTokens {
 
 		require!(token.properties & 0b00000100>0 || dealer!=Address::zero() ,"La vente directe n'est pas autorisé");
 		require!(dealer==Address::zero() || idx<1000 ,"Le revendeur n'est pas autorisé");
-		require!(payment >= token.price.clone()+BigUint::from(payment_for_dealer),"Paiement inferieur au prix du token");
+		require!(payment >= BigUint::from(payment_for_dealer+100000000000000*token.price.clone() as u64),"Paiement inferieur au prix du token");
 
 		//Versement au vendeur
 		let payment_for_owner=payment.clone()-BigUint::from(payment_for_dealer);
@@ -372,7 +391,6 @@ pub trait ENonFungibleTokens {
 				&BigUint::from(payment_for_dealer),
 				b"Reglement du dealer"
 			);
-
 		}
 
 		if payment_for_owner>0 {
@@ -382,7 +400,6 @@ pub trait ENonFungibleTokens {
 				b"Reglement du owner"
 			);
 		}
-
 
 		token.state=1;//Le token n'est plus a vendre
 		token.owner=caller; //On change le propriétaire
@@ -422,14 +439,14 @@ pub trait ENonFungibleTokens {
 				let mut price=token.price;
 				let mut markup=0u16;
 				if idx<1000 {
-					price=price+BigUint::from(10000000000000000*token.dealer_markup[idx] as u64);
+					price=price+100*token.dealer_markup[idx] as u32;
 					markup=token.dealer_markup[idx];
 				}
 
 				let mut has_secret=0u8;
 				if token.secret.len()>0 {has_secret=1u8;}
 
-				item.append(&mut price.to_bytes_be_pad_right(10).unwrap_or(Vec::new()));
+				item.append(&mut price.to_be_bytes().to_vec());
 				item.append(&mut token.owner.to_vec());
 				item.push(has_secret);
 				item.push(token.state);
@@ -491,9 +508,9 @@ pub trait ENonFungibleTokens {
 	//Récupération d'un token
 	#[view(getToken)]
 	#[storage_get("token")]
-	fn get_token(&self,  token_id: u64) -> Token<BigUint>;
+	fn get_token(&self,  token_id: u64) -> Token;
 	#[storage_set("token")]
-	fn set_token(&self, token_id: u64, token: &Token<BigUint>);
+	fn set_token(&self, token_id: u64, token: &Token);
 
 
 	//Fonction d'approbation pour maintient de compatibilité avec les NFT
