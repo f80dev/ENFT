@@ -60,7 +60,7 @@ mint(){
   clear
   echo "Minage du token"
   #mint(count: u64, new_token_owner: Address, new_token_uri: &Vec<u8>,secret: &Vec<u8>, new_token_price: BigUint)
-  ARGUMENTS="1 0xaaaaaaaaaa 0xabababab 0xffffff 0xfffff0 0xffffff 0x0139472eff6886771a982f3083da5d421f24c29181e63888228dc81ca60d69e1 50 10"
+  ARGUMENTS="1 0x4D6F6E204E465420706F757220766F7573 0x4163686574657A206D6F6E204E4654 0x553246736447566B58312B68366350767054745A42414151326231483851654141416B622F33476C5A67553D 0x00 0x00 0x00 07 0 0"
   erdpy contract call ${ADDRESS} --chain ${CHAINID} --proxy ${PROXY} --recall-nonce --pem=${BOB} --arguments ${ARGUMENTS} --gas-limit=120000000 --function="mint" --send
   echo "Transaction ${PROXY}/transaction/${TRANSACTION}"
 }
@@ -140,17 +140,27 @@ infos(){
   erdpy contract query ${ADDRESS} --proxy ${PROXY} --function="totalMinted"
 
   echo ""
+  echo "count"
+  erdpy contract query ${ADDRESS} --proxy ${PROXY} --function="tokenCount"
+
+  echo ""
   echo "miner of 1"
   erdpy contract query ${ADDRESS} --proxy ${PROXY} --function="tokenMiner" --arguments 0
 
-  ARGUMENTS="0x0139472eff6886771a982f3083da5d421f24c29181e63888228dc81ca60d69e1 0x0000000000000000000000000000000000000000000000000000000000000000 0x0000000000000000000000000000000000000000000000000000000000000000"
+  ARGUMENTS="0x0000000000000000000000000000000000000000000000000000000000000000 0x0000000000000000000000000000000000000000000000000000000000000000 0x0000000000000000000000000000000000000000000000000000000000000000"
   echo ""
   echo "recuperation des tokens sur ${ADDRESS}"
   erdpy --verbose contract query ${ADDRESS} --proxy ${PROXY}  --function="tokens" --arguments ${ARGUMENTS}
 }
 
 
+dealers(){
+  echo "Nombre de dealers"
+  erdpy --verbose contract query ${ADDRESS} --proxy ${PROXY}  --function="dealerCount"
 
+  echo "Premier dealer"
+  erdpy --verbose contract query ${ADDRESS} --proxy ${PROXY}  --function="getDealer" --arguments "0"
+}
 
 
 transfert(){
@@ -173,5 +183,4 @@ _test() {
   mint
   infos
 }
-
 

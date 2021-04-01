@@ -6,12 +6,13 @@ elrond_wasm::derive_imports!();
 #[derive(NestedEncode, NestedDecode, TopEncode, TopDecode, TypeAbi)]
 pub struct Token {
      pub price: u32,
-     pub uri: Vec<u8>,
+     pub title: Vec<u8>,
+     pub description: Vec<u8>,
      pub secret:Vec<u8>,
      pub gift:u16,
      pub state:u8,
 
-     pub dealer_addr:Vec<Address>,
+     pub dealer_ids:Vec<u64>,
      pub dealer_markup:Vec<u16>,
 
      pub min_markup:u16,
