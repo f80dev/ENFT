@@ -3,14 +3,16 @@
 
 #![no_std]
 #![allow(clippy::too_many_arguments)]
+#![allow(unused_attributes)]
+#![allow(non_snake_case)]
 
-imports!();
+elrond_wasm::imports!();
+elrond_wasm::derive_imports!();
 
 mod token;
 mod dealer;
 use token::Token;
 use dealer::Dealer;
-use elrond_wasm::types::Address;
 
 
 #[elrond_wasm_derive::contract(ENonFungibleTokensImpl)]
@@ -282,24 +284,51 @@ pub trait ENonFungibleTokens {
 
 	//Ajouter un miner approuvé à un dealer
 	#[endpoint]
-	fn add_miner(&self,  miner_addr: Address) -> SCResult<()> {
+	fn add_miner(&self,  miner_addr: &Address,ipfs_token:BigUint) -> SCResult<()> {
 		let dealer_id=self.find_dealer_by_addr(&self.get_caller());
 		require!(dealer_id < self.get_dealer_count(), "Dealer not listed");
 
 		let mut dealer=self.get_dealer(dealer_id);
-		dealer.miners.push(miner_addr);
+		dealer.miners.push(miner_addr.clone());
 		self.set_dealer(dealer_id,&dealer);
+
+		self.ipfs_map().insert(miner_addr.clone(),ipfs_token);
 
 		Ok(())
 	}
 
 
+	//Supprimer un miner approuvé à un dealer
 	#[endpoint]
-	fn new_dealer(&self,  addr: Address,name: &Vec<u8>) -> SCResult<u64> {
+	fn del_miner(&self,  miner_addr: &Address) -> SCResult<()> {
+		let dealer_id=self.find_dealer_by_addr(&self.get_caller());
+		require!(dealer_id < self.get_dealer_count(), "Dealer not listed");
+
+		let mut dealer=self.get_dealer(dealer_id);
+
+		let mut idx=0;
+		for miner in dealer.miners.iter() {
+			if miner == miner_addr {
+				dealer.miners.remove(idx);
+				self.set_dealer(dealer_id,&dealer);
+				break;
+			}
+			idx=idx+1;
+		}
+
+		Ok(())
+	}
+
+
+
+
+	#[endpoint]
+	fn new_dealer(&self,  ipfs: &Vec<u8>) -> SCResult<u64> {
+		let addr=self.get_caller();
 		let idx=self.find_dealer_by_addr(&addr);
 		if idx == self.get_dealer_count() {
 			let dealer = Dealer {
-				name: name.to_vec(),
+				ipfs: ipfs.to_vec(),
 				state: 0,
 				addr: addr.clone(),
 				miners: Vec::new()
@@ -307,21 +336,27 @@ pub trait ENonFungibleTokens {
 			self.set_dealer(idx,&dealer);
 			self.set_dealer_count(idx+1);
 		}
+
 		Ok(idx)
 	}
 
+	//Retourne la liste des mineurs approuvé par un distributeurs (separateur de liste : 000000)
 	#[view(miners)]
-	fn miners(&self,  dealer_addr: Address) -> Vec<Address> {
+	fn miners(&self,  dealer_addr: Address) -> Vec<u8> {
 		let idx=self.find_dealer_by_addr(&dealer_addr);
 		let dealer=self.get_dealer(idx);
 
-		// let rc=Vec::new();
-		// for miner in dealer.miners.iter() {
-		// 	rc.append(&mut token.owner.to_vec());
-		// }
-		//
+		let mut rc=Vec::new();
+		for miner in dealer.miners.iter() {
+			rc.append(&mut miner.to_vec());
+			let ipfs=self.ipfs_map().get(miner).unwrap();
+			rc.append(&mut ipfs.to_bytes_be().to_vec());
+			rc.push(0);
+			rc.push(0);
+			rc.push(0);
+		}
 
-		return dealer.miners;
+		return rc;
 	}
 
 
@@ -333,6 +368,10 @@ pub trait ENonFungibleTokens {
 		for idx in 0..self.get_dealer_count() {
 			let dealer=self.get_dealer(idx);
 			rc.append(&mut dealer.addr.to_vec());
+			rc.append(&mut dealer.ipfs.to_vec());
+			rc.push(0);
+			rc.push(0);
+			rc.push(0);
 		}
 
 		// let rc=Vec::new();
@@ -589,6 +628,10 @@ pub trait ENonFungibleTokens {
 	fn set_total_minted(&self, total_minted: u64);
 
 
+	#[storage_mapper("ipfs")]
+	fn ipfs_map(&self) -> MapMapper<Self::Storage, Address, BigUint>;
+
+
 	#[view(dealerCount)]
 	#[storage_get("dealerCount")]
 	fn get_dealer_count(&self) -> u64;
@@ -610,6 +653,14 @@ pub trait ENonFungibleTokens {
 	#[storage_set("token")]
 	fn set_token(&self, token_id: u64, token: &Token);
 
+
+
+	//Information sur les mineurs / créateurs
+	#[view(getMinerInfos)]
+	#[storage_get("minerInfos")]
+	fn get_miner_infos(&self,  miner: &Address) -> Vec<u8>;
+	#[storage_set("minerInfos")]
+	fn set_miner_infos(&self, miner: &Address, infos: Vec<u8>);
 
 
 
