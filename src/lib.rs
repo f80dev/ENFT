@@ -259,6 +259,7 @@ pub trait ENonFungibleTokens {
 	}
 
 	//Recherche un dealer par son adresse
+	//retourne dealer_count si on a pas trouvé le dealer
 	fn find_dealer_by_addr(&self,dealer_addr: &Address) -> u64 {
 		let total=self.get_dealer_count();
 		for i in 0..total {
@@ -320,8 +321,22 @@ pub trait ENonFungibleTokens {
 	}
 
 
+	#[endpoint]
+	fn dealer_state(&self,  state: u8) -> SCResult<()> {
+		let addr = self.get_caller();
+		let idx = self.find_dealer_by_addr(&addr);
+
+		require!(idx<self.get_dealer_count(),"Dealer not listed");
+		let mut dealer=self.get_dealer(idx);
+
+		dealer.state=state;
+		self.set_dealer(idx,&dealer);
+		return Ok(());
+	}
 
 
+				//Ajout un nouveau distributeur
+	//state=0 open / 1 close
 	#[endpoint]
 	fn new_dealer(&self,  ipfs: &Vec<u8>) -> SCResult<u64> {
 		let addr=self.get_caller();
@@ -336,17 +351,29 @@ pub trait ENonFungibleTokens {
 			self.set_dealer(idx,&dealer);
 			self.set_dealer_count(idx+1);
 		}
-
 		Ok(idx)
 	}
 
-	//Retourne la liste des mineurs approuvé par un distributeurs (separateur de liste : 000000)
+
+
+	#[view(is_miner)]
+	fn is_miner(&self,  miner_addr: Address) -> bool {
+		return self.ipfs_map().contains_key(&miner_addr);
+	}
+
+
+
+		//Retourne la liste des mineurs approuvé par un distributeurs (separateur de liste : 000000)
 	#[view(miners)]
 	fn miners(&self,  dealer_addr: Address) -> Vec<u8> {
-		let idx=self.find_dealer_by_addr(&dealer_addr);
-		let dealer=self.get_dealer(idx);
 
 		let mut rc=Vec::new();
+		let idx=self.find_dealer_by_addr(&dealer_addr);
+		if idx==self.get_dealer_count() {
+			return rc;
+		}
+
+		let dealer=self.get_dealer(idx);
 		for miner in dealer.miners.iter() {
 			rc.append(&mut miner.to_vec());
 			let ipfs=self.ipfs_map().get(miner).unwrap();
@@ -368,6 +395,7 @@ pub trait ENonFungibleTokens {
 		for idx in 0..self.get_dealer_count() {
 			let dealer=self.get_dealer(idx);
 			rc.append(&mut dealer.addr.to_vec());
+			rc.push(dealer.state);
 			rc.append(&mut dealer.ipfs.to_vec());
 			rc.push(0);
 			rc.push(0);
@@ -429,7 +457,7 @@ pub trait ENonFungibleTokens {
 
 		self.set_token(token_id,&token);
 
-		Ok(())
+		return Ok(())
 	}
 
 
@@ -585,6 +613,7 @@ pub trait ENonFungibleTokens {
 				item.append(&mut token.max_markup.to_be_bytes().to_vec());
 				item.append(&mut markup.to_be_bytes().to_vec());
 				item.append(&mut token.miner_ratio.to_be_bytes().to_vec());
+				item.append(&mut token.miner.to_vec());
 				item.append(&mut i.to_be_bytes().to_vec());
 				item.append(&mut token.title);
 				item.append(&mut token.description);
