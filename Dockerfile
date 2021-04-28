@@ -11,16 +11,20 @@ FROM ubuntu:groovy
 
 RUN apt update
 RUN apt install -y wget python3 python3-venv sudo build-essential nano net-tools python3-pip
+RUN apt install -y libncurses5
+RUN pip3 install wheel
+
 RUN adduser --home /home/erd --shell /bin/bash --disabled-password erd
 RUN echo "erd ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 USER erd
 
 RUN wget -O ~/erdpy-up.py https://raw.githubusercontent.com/ElrondNetwork/elrond-sdk/master/erdpy-up.py --no-check-certificate
 RUN python3 ~/erdpy-up.py
+
 #RUN source ~/elrondsdk/erdpy-activate
 
 ENV PATH="/home/erd/elrondsdk/:${PATH}"
-RUN pip install erdpy==1.0.9
+RUN pip install erdpy==1.0.12
 
 WORKDIR /home/erd/dev
 

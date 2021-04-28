@@ -21,11 +21,17 @@ pub trait ENonFungibleTokens {
 	//Initialisation du SC
 	#[init]
 	fn init(&self) {
-		let owner = self.get_caller();
+		let owner = self.blockchain().get_caller();
 		self.set_owner(&owner);
 		self.set_total_minted(0); //Aucun token miné
 		self.set_dealer_count(0); //Aucun distributeur
 	}
+
+
+	// fn decrypt(&self,secret: &Vec<u8>) -> Vec<u8> {
+	// 	//TODO implémenter ici un fonction de décryptage
+	// 	return secret;
+	// }
 
 
 	/// Creates new tokens and sets their ownership to the specified account.
@@ -44,17 +50,19 @@ pub trait ENonFungibleTokens {
 			properties:u8,
 			miner_ratio:u16,
 			gift:u16,
+			money:TokenIdentifier
 	) -> SCResult<u64> {
-		let caller=self.get_caller();
+		// let dec_secret=self.decrypt(secret);
+
+		let caller=self.blockchain().get_caller();
 		require!(count>0,"E01: At least one token must be mined");
 		require!(new_token_title.len()+new_token_description.len() > 0,"E02: Title & description can't be empty together");
 		require!(min_markup <= max_markup,"E03: L'interval de commission est incorrect");
-		//require!(initial_price >= 0,"Le prix initial est nécessairement positif");
 		//La limite du miner_ratio est à 10000 car on multiplie par 100 pour autoriser un pourcentage à 2 décimal
 		require!(miner_ratio<=10000,"E04: La part du mineur doit etre entre 0 et 100");
 		require!(payment>=BigUint::from(count*gift as u64),"E05: Transfert de fond insuffisant pour le token");
 
-		let token_id=self.perform_mint(count,caller,new_token_title,new_token_description,secret,initial_price,min_markup,max_markup,properties,miner_ratio,gift);
+		let token_id=self.perform_mint(count,caller,new_token_title,new_token_description,secret,initial_price,min_markup,max_markup,properties,miner_ratio,gift,&money);
 
 		Ok(token_id)
 	}
@@ -68,7 +76,7 @@ pub trait ENonFungibleTokens {
 	fn approve(&self, token_id: u64, approved_address: Address) -> SCResult<()> {
 		let token=self.get_token(token_id);
 		require!(token_id < self.get_total_minted(), "E06: Token does not exist!");
-		require!(self.get_caller() == token.owner ,"E07: Only the token owner can approve!");
+		require!(self.blockchain().get_caller() == token.owner ,"E07: Only the token owner can approve!");
 
 		self.set_approval(token_id, &approved_address);
 
@@ -84,7 +92,7 @@ pub trait ENonFungibleTokens {
 		require!(token_id < self.get_total_minted(), "E08: Token does not exist!");
 
 		let token=self.get_token(token_id);
-		require!(self.get_caller() == token.owner,"E09: Only the token owner can revoke approval!");
+		require!(self.blockchain().get_caller() == token.owner,"E09: Only the token owner can revoke approval!");
 
 		if !self.approval_is_empty(token_id) {
 			//TODO: on considère les approuvés comme des distributeurs, on doit donc supprimer le distributeur
@@ -96,37 +104,6 @@ pub trait ENonFungibleTokens {
 
 
 
-		//Retourne le contenu de la propriété secret du token en échange d'une vérification
-	//que l'appelant est bien propriétaire du token
-	#[endpoint]
-	fn open(&self, token_id: u64) -> SCResult<Vec<u8>> {
-			require!(token_id < self.get_total_minted(), "Token does not exist!");
-			let mut token=self.get_token(token_id);
-
-			let caller = self.get_caller();
-			require!(caller == token.owner,"E10: Seul le propriétaire peut ouvrir le token");
-			require!(token.secret.len()>0,"E11: Ce token ne contient pas de secret");
-
-			//let secret=mc.decrypt_base64_to_string(&token.secret).unwrap();
-			//TODO: mettre en place le décryptage du secret
-			//secret=self.decrypt(&secret);
-
-			let secret=token.secret.clone();
-			//https://docs.rs/openssl/0.10.32/openssl/rsa/index.html
-			//let secret=v3::decrypt("secret",&enc_data);
-
-			if token.gift>0 {
-				self.send().direct_egld(
-					&token.owner,
-					&BigUint::from(token.gift as u64*10000000000000000),
-					b"Owner pay"
-				);
-				token.gift=0;
-				self.set_token(token_id,&token);
-			}
-
-			return Ok(secret);
-	}
 
 
 	/// Transfer ownership of the token to a new account.
@@ -138,7 +115,7 @@ pub trait ENonFungibleTokens {
 		//Le mineur peut avoir limité la possibilité de transfert du token à sa création
 		require!(token.properties & 0b00000001 > 0,"E13: Ce token ne peut être offert");
 
-		let caller = self.get_caller();
+		let caller = self.blockchain().get_caller();
 
 		if caller == token.owner {
 			token.owner=to;
@@ -174,7 +151,8 @@ pub trait ENonFungibleTokens {
 					min_markup: u16,max_markup: u16,
 					properties:u8,
 					miner_ratio:u16,
-					gift:u16) -> u64 {
+					gift:u16,
+					money: &TokenIdentifier) -> u64 {
 		let new_owner_current_total = self.get_token_count(&new_token_owner);
 		let total_minted = self.get_total_minted();
 		let first_new_id = total_minted;
@@ -196,6 +174,7 @@ pub trait ENonFungibleTokens {
 				dealer_markup:Vec::new(),
 				properties:properties,
 				miner_ratio:miner_ratio,
+				money:money.clone()
 			};
 
 			self.set_token(id, &token);
@@ -216,15 +195,7 @@ pub trait ENonFungibleTokens {
 	}
 
 
-
-	//Détruit un token en lui affectant l'adresse 0x0 comme propriétaire et mineur
-	#[endpoint]
-	fn burn(&self, token_id: u64) -> SCResult<()> {
-		require!(token_id < self.get_total_minted(), "E15: Token does not exist!");
-
-		let caller = self.get_caller();
-		let mut token = self.get_token(token_id);
-		require!(caller == token.owner || caller == token.miner,"E16: Only the owner account can burn token!");
+	fn perform_burn(self,token_id: u64,token: &mut Token) -> bool {
 
 		if token.gift>0 {
 			self.send().direct_egld(
@@ -233,12 +204,73 @@ pub trait ENonFungibleTokens {
 				b"Miner refund"
 			);
 		}
+
 		token.miner=Address::zero();
 		token.owner=Address::zero();
 		self.set_token(token_id,&token);
+
+		return true;
+	}
+
+
+	//Détruit un token en lui affectant l'adresse 0x0 comme propriétaire et mineur
+	#[endpoint]
+	fn burn(&self, token_id: u64) -> SCResult<()> {
+		require!(token_id < self.get_total_minted(), "E15: Token does not exist!");
+
+		let caller = self.blockchain().get_caller();
+		let mut token = self.get_token(token_id);
+		require!(caller == token.owner || caller == token.miner,"E16: Only the owner account can burn token!");
+
+		self.perform_burn(token_id, &mut token);
+
 		return Ok(());
 
 	}
+
+	fn send_money(&self,token:&Token,dest:&Address,amount:u64,comment:&[u8]) {
+		if token.money.is_egld() {
+			self.send().direct_egld(dest,&BigUint::from(amount*10000000000000000),comment);
+		} else {
+			self.send().direct(dest, &token.money, &BigUint::from(amount*10000000000000000), comment);
+		}
+	}
+
+
+
+	//Retourne le contenu de la propriété secret du token en échange d'une vérification
+	//que l'appelant est bien propriétaire du token
+	#[endpoint]
+	fn open(&self, token_id: u64) -> SCResult<Vec<u8>> {
+		require!(token_id < self.get_total_minted(), "Token does not exist!");
+		let mut token=self.get_token(token_id);
+
+		let caller = self.blockchain().get_caller();
+		require!(caller == token.owner,"E10: Seul le propriétaire peut ouvrir le token");
+		require!(token.secret.len()>0,"E11: Ce token ne contient pas de secret");
+
+		//let secret=mc.decrypt_base64_to_string(&token.secret).unwrap();
+		//TODO: mettre en place le décryptage du secret
+		//secret=self.decrypt(&secret);
+
+		let secret=token.secret.clone();
+		//https://docs.rs/openssl/0.10.32/openssl/rsa/index.html
+		//let secret=v3::decrypt("secret",&enc_data);
+
+		if token.gift>0 {
+			self.send_money(&token,&token.owner,token.gift as u64,b"Owner pay");
+			token.gift=0;
+			self.set_token(token_id,&token);
+		}
+
+		if token.properties & 0b00001000>0 {
+			self.perform_burn(token_id,&mut token);
+		}
+
+		return Ok(secret);
+	}
+
+
 
 
 	//Permet la mise en vente ou le retrait de la vente d'un token
@@ -246,7 +278,7 @@ pub trait ENonFungibleTokens {
 	#[endpoint]
 	fn setstate(&self,  token_id: u64,new_state:u8) -> SCResult<()> {
 		let mut token = self.get_token(token_id);
-		let caller=self.get_caller();
+		let caller=self.blockchain().get_caller();
 
 		require!(token_id < self.get_total_minted(), "E19: Token does not exist!");
 		require!(token.owner == caller,"E17: Only token owner change state");
@@ -286,7 +318,7 @@ pub trait ENonFungibleTokens {
 	//Ajouter un miner approuvé à un dealer
 	#[endpoint]
 	fn add_miner(&self,  miner_addr: &Address,ipfs_token:BigUint) -> SCResult<()> {
-		let dealer_id=self.find_dealer_by_addr(&self.get_caller());
+		let dealer_id=self.find_dealer_by_addr(&self.blockchain().get_caller());
 		require!(dealer_id < self.get_dealer_count(), "Dealer not listed");
 
 		let mut dealer=self.get_dealer(dealer_id);
@@ -302,7 +334,7 @@ pub trait ENonFungibleTokens {
 	//Supprimer un miner approuvé à un dealer
 	#[endpoint]
 	fn del_miner(&self,  miner_addr: &Address) -> SCResult<()> {
-		let dealer_id=self.find_dealer_by_addr(&self.get_caller());
+		let dealer_id=self.find_dealer_by_addr(&self.blockchain().get_caller());
 		require!(dealer_id < self.get_dealer_count(), "Dealer not listed");
 
 		let mut dealer=self.get_dealer(dealer_id);
@@ -323,7 +355,7 @@ pub trait ENonFungibleTokens {
 
 	#[endpoint]
 	fn dealer_state(&self,  state: u8) -> SCResult<()> {
-		let addr = self.get_caller();
+		let addr = self.blockchain().get_caller();
 		let idx = self.find_dealer_by_addr(&addr);
 
 		require!(idx<self.get_dealer_count(),"Dealer not listed");
@@ -335,11 +367,11 @@ pub trait ENonFungibleTokens {
 	}
 
 
-				//Ajout un nouveau distributeur
+	//Ajout un nouveau distributeur
 	//state=0 open / 1 close
 	#[endpoint]
 	fn new_dealer(&self,  ipfs: &Vec<u8>) -> SCResult<u64> {
-		let addr=self.get_caller();
+		let addr=self.blockchain().get_caller();
 		let idx=self.find_dealer_by_addr(&addr);
 		if idx == self.get_dealer_count() {
 			let dealer = Dealer {
@@ -387,26 +419,22 @@ pub trait ENonFungibleTokens {
 	}
 
 
-	//retourne l'ensemble des distributeurs référencés
+	//retourne l'ensemble des distributeurs référencés si l'adresse est 0x0 ou les distributeurs d'un mineur
 	#[view(dealers)]
-	fn dealers(&self) -> Vec<u8> {
+	fn dealers(&self,filter_miner:Address) -> Vec<u8> {
 		let mut rc=Vec::new();
 
 		for idx in 0..self.get_dealer_count() {
 			let dealer=self.get_dealer(idx);
-			rc.append(&mut dealer.addr.to_vec());
-			rc.push(dealer.state);
-			rc.append(&mut dealer.ipfs.to_vec());
-			rc.push(0);
-			rc.push(0);
-			rc.push(0);
+			if filter_miner==Address::zero() || dealer.miners.contains(&filter_miner) {
+				rc.append(&mut dealer.addr.to_vec());
+				rc.push(dealer.state);
+				rc.append(&mut dealer.ipfs.to_vec());
+				rc.push(0);
+				rc.push(0);
+				rc.push(0);
+			}
 		}
-
-		// let rc=Vec::new();
-		// for miner in dealer.miners.iter() {
-		// 	rc.append(&mut token.owner.to_vec());
-		// }
-		//
 
 		return rc;
 	}
@@ -417,7 +445,7 @@ pub trait ENonFungibleTokens {
 	//Cette fonction est réservé au propriétaire du token
 	#[endpoint]
 	fn add_dealer(&self,  token_id: u64, addr: Address) -> SCResult<()> {
-		let caller=self.get_caller();
+		let caller=self.blockchain().get_caller();
 		let mut token = self.get_token(token_id);
 
 		require!(token_id < self.get_total_minted(), "E20: Token does not exist!");
@@ -447,7 +475,7 @@ pub trait ENonFungibleTokens {
 	#[endpoint]
 	fn clear_dealer(&self,  token_id: u64) -> SCResult<()> {
 		let mut token = self.get_token(token_id);
-		let caller=self.get_caller();
+		let caller=self.blockchain().get_caller();
 
 		require!(token_id < self.get_total_minted(), "E22: Token does not exist!");
 		require!(token.owner == caller,"E23: Only token owner can remove dealer");
@@ -469,7 +497,7 @@ pub trait ENonFungibleTokens {
 		require!(token_id < self.get_total_minted(), "E24: Token does not exist!");
 		let mut token = self.get_token(token_id);
 
-		let caller = self.get_caller();
+		let caller = self.blockchain().get_caller();
 
 		let addrs=self.get_dealer_addresses_for_token(&token);
 		let idx = addrs.iter().position(|x| x == &caller).unwrap_or(1000);
@@ -489,14 +517,14 @@ pub trait ENonFungibleTokens {
 	//Fonction d'achat d'un token
 	//token_id: désigne le token à acheter
 	//dealer: déclare le vendeur qui à fait la vente. Cela permet au système de récupéré le prix avec la commission et de procéder au reversement
-	#[payable("EGLD")]
+	#[payable("*")]
 	#[endpoint]
-	fn buy(&self, #[payment] payment: BigUint, token_id: u64,dealer:Address) -> SCResult<()> {
+	fn buy(&self, #[payment] payment: BigUint,#[payment_token] pay_token: TokenIdentifier, token_id: u64,dealer:Address) -> SCResult<()> {
 
 		require!(token_id < self.get_total_minted(), "E28: Ce token n'existe pas");
 		let mut token = self.get_token(token_id);
 
-		let caller=self.get_caller();
+		let caller=self.blockchain().get_caller();
 		require!(token.owner != caller,"E29: Ce token vous appartient déjà");
 		require!(token.state == 0,"E30: Ce token n'est pas en vente");
 
@@ -513,34 +541,22 @@ pub trait ENonFungibleTokens {
 		require!(payment >= BigUint::from(payment_for_dealer+100000000000000*token.price.clone() as u64),"E33: Paiement inferieur au prix du token");
 
 		//Versement au vendeur
-		let payment_for_owner=payment.clone()-BigUint::from(payment_for_dealer);
+		let payment_for_owner=payment-payment_for_dealer;
 
 		if dealer!=Address::zero() && payment_for_dealer>0 {
 			//On retribue le mineur sur la commission du distributeur
 			if token.miner_ratio>0 {
 				let payment_for_miner=1000000000000*token.dealer_markup[idx] as u64*token.miner_ratio as u64;
-				self.send().direct_egld(
-					&token.miner,
-					&BigUint::from(payment_for_miner),
-					b"miner pay"
-				);
+				self.send_money(&token,&token.miner,payment_for_miner,b"miner pay");
 				payment_for_dealer=payment_for_dealer-payment_for_miner;
 			}
 
 			//Transaction issue d'un revendeur
-			self.send().direct_egld(
-				&dealer,
-				&BigUint::from(payment_for_dealer),
-				b"dealer pay"
-			);
+			self.send_money(&token,&dealer,payment_for_dealer,b"dealer pay");
 		}
 
 		if payment_for_owner>0 {
-			self.send().direct_egld(
-				&token.owner,
-				&payment_for_owner,
-				b"owner pay"
-			);
+			self.send_money(&token,&token.owner,payment_for_owner,b"owner pay");
 		}
 
 		token.state=1;//Le token n'est plus a vendre
