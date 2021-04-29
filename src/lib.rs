@@ -541,7 +541,12 @@ pub trait ENonFungibleTokens {
 		require!(payment >= BigUint::from(payment_for_dealer+100000000000000*token.price.clone() as u64),"E33: Paiement inferieur au prix du token");
 
 		//Versement au vendeur
-		let payment_for_owner=payment-payment_for_dealer;
+		let temp:vec<u8>=payment.to_bytes_be();
+		let mut array: [u8; 8] = [0,0,0,0,0,0,0,0];
+		for i in 0..8 {
+			array[i]=temp[i];
+		}
+		let payment_for_owner=u64::from_be_bytes(array)-payment_for_dealer;
 
 		if dealer!=Address::zero() && payment_for_dealer>0 {
 			//On retribue le mineur sur la commission du distributeur
