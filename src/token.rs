@@ -12,7 +12,7 @@ pub struct Token {
      pub gift:u16,
      pub state:u8,
 
-     pub dealer_ids:Vec<u64>,          //Distributeurs autorisés
+     pub dealer_ids:Vec<u16>,          //Distributeurs autorisés
      pub dealer_markup:Vec<u16>,        //Marge de chaque distributeur
 
      pub min_markup:u16,                //Marge minimum autorisée

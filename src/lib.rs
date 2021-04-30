@@ -228,11 +228,11 @@ pub trait ENonFungibleTokens {
 
 	}
 
-	fn send_money(&self,token:&Token,dest:&Address,amount:u64,comment:&[u8]) {
+	fn send_money(&self,token:&Token,dest:&Address,amount:BigUint,comment:&[u8]) {
 		if token.money.is_egld() {
-			self.send().direct_egld(dest,&BigUint::from(amount*10000000000000000),comment);
+			self.send().direct_egld(dest,&(amount*BigUint::from(10000000000000000u64)),comment);
 		} else {
-			self.send().direct(dest, &token.money, &BigUint::from(amount*10000000000000000), comment);
+			self.send().direct(dest, &token.money, &(amount*BigUint::from(10000000000000000u64)), comment);
 		}
 	}
 
@@ -258,7 +258,7 @@ pub trait ENonFungibleTokens {
 		//let secret=v3::decrypt("secret",&enc_data);
 
 		if token.gift>0 {
-			self.send_money(&token,&token.owner,token.gift as u64,b"Owner pay");
+			self.send_money(&token,&token.owner,BigUint::from(token.gift as u64),b"Owner pay");
 			token.gift=0;
 			self.set_token(token_id,&token);
 		}
@@ -292,8 +292,8 @@ pub trait ENonFungibleTokens {
 
 	//Recherche un dealer par son adresse
 	//retourne dealer_count si on a pas trouvé le dealer
-	fn find_dealer_by_addr(&self,dealer_addr: &Address) -> u64 {
-		let total=self.get_dealer_count();
+	fn find_dealer_by_addr(&self,dealer_addr: &Address) -> u16 {
+		let total:u16=self.get_dealer_count();
 		for i in 0..total {
 			let dealer=self.get_dealer(i);
 			if &dealer.addr==dealer_addr {
@@ -370,7 +370,7 @@ pub trait ENonFungibleTokens {
 	//Ajout un nouveau distributeur
 	//state=0 open / 1 close
 	#[endpoint]
-	fn new_dealer(&self,  ipfs: &Vec<u8>) -> SCResult<u64> {
+	fn new_dealer(&self,  ipfs: &Vec<u8>) -> SCResult<u16> {
 		let addr=self.blockchain().get_caller();
 		let idx=self.find_dealer_by_addr(&addr);
 		if idx == self.get_dealer_count() {
@@ -519,7 +519,7 @@ pub trait ENonFungibleTokens {
 	//dealer: déclare le vendeur qui à fait la vente. Cela permet au système de récupéré le prix avec la commission et de procéder au reversement
 	#[payable("*")]
 	#[endpoint]
-	fn buy(&self, #[payment] payment: BigUint,#[payment_token] pay_token: TokenIdentifier, token_id: u64,dealer:Address) -> SCResult<()> {
+	fn buy(&self, #[payment] payment: BigUint, #[payment_token] _pay_token: TokenIdentifier,token_id: u64,dealer:Address) -> SCResult<()> {
 
 		require!(token_id < self.get_total_minted(), "E28: Ce token n'existe pas");
 		let mut token = self.get_token(token_id);
@@ -538,26 +538,22 @@ pub trait ENonFungibleTokens {
 
 		require!(token.properties & 0b00000100>0 || dealer!=Address::zero() ,"E31: La vente directe n'est pas autorisé");
 		require!(dealer==Address::zero() || idx<1000 ,"E32: Le revendeur n'est pas autorisé");
-		require!(payment >= BigUint::from(payment_for_dealer+100000000000000*token.price.clone() as u64),"E33: Paiement inferieur au prix du token");
 
-		//Versement au vendeur
-		let temp:vec<u8>=payment.to_bytes_be();
-		let mut array: [u8; 8] = [0,0,0,0,0,0,0,0];
-		for i in 0..8 {
-			array[i]=temp[i];
-		}
-		let payment_for_owner=u64::from_be_bytes(array)-payment_for_dealer;
+		//calcul du payment au owner
+		let payment_for_owner=payment-BigUint::from(payment_for_dealer);
+		require!(payment_for_owner >= BigUint::from(token.price.clone() as u64),"E33: Paiement du propriétaire inferieur au prix du token");
+
 
 		if dealer!=Address::zero() && payment_for_dealer>0 {
 			//On retribue le mineur sur la commission du distributeur
 			if token.miner_ratio>0 {
 				let payment_for_miner=1000000000000*token.dealer_markup[idx] as u64*token.miner_ratio as u64;
-				self.send_money(&token,&token.miner,payment_for_miner,b"miner pay");
+				self.send_money(&token,&token.miner,BigUint::from(payment_for_miner),b"miner pay");
 				payment_for_dealer=payment_for_dealer-payment_for_miner;
 			}
 
 			//Transaction issue d'un revendeur
-			self.send_money(&token,&dealer,payment_for_dealer,b"dealer pay");
+			self.send_money(&token,&dealer,BigUint::from(payment_for_dealer),b"dealer pay");
 		}
 
 		if payment_for_owner>0 {
@@ -577,7 +573,7 @@ pub trait ENonFungibleTokens {
 	fn get_dealer_addresses_for_token(&self,token: &Token) -> Vec<Address> {
 		let mut rc=Vec::new();
 		for i in 0..token.dealer_ids.len(){
-			let dealer=self.get_dealer(token.dealer_ids[i] as u64);
+			let dealer=self.get_dealer(token.dealer_ids[i]);
 			rc.push(dealer.addr);
 		}
 		return rc;
@@ -610,6 +606,7 @@ pub trait ENonFungibleTokens {
 				//doc sur le conversion :https://docs.rs/elrond-wasm/0.10.3/elrond_wasm/
 				item.append(&mut token.title.len().to_be_bytes().to_vec());
 				item.append(&mut token.description.len().to_be_bytes().to_vec());
+				item.append(&mut token.money.as_name().len().to_be_bytes().to_vec());
 
 				//Puis on ajoute l'ensemble des informations d'un token
 				//dans un vecteur d'octets
@@ -626,6 +623,8 @@ pub trait ENonFungibleTokens {
 				}
 
 				item.append(&mut price.to_be_bytes().to_vec());
+				item.append(&mut token.money.as_esdt_identifier().to_vec());
+
 				item.append(&mut token.owner.to_vec());
 				item.push(has_secret);
 				item.push(token.state);
@@ -635,7 +634,8 @@ pub trait ENonFungibleTokens {
 				item.append(&mut markup.to_be_bytes().to_vec());
 				item.append(&mut token.miner_ratio.to_be_bytes().to_vec());
 				item.append(&mut token.miner.to_vec());
-				item.append(&mut i.to_be_bytes().to_vec());
+				item.append(&mut i.to_be_bytes().to_vec()); //Identifiant du token
+
 				item.append(&mut token.title);
 				item.append(&mut token.description);
 
@@ -684,9 +684,9 @@ pub trait ENonFungibleTokens {
 
 	#[view(dealerCount)]
 	#[storage_get("dealerCount")]
-	fn get_dealer_count(&self) -> u64;
+	fn get_dealer_count(&self) -> u16;
 	#[storage_set("dealerCount")]
-	fn set_dealer_count(&self, token_count: u64);
+	fn set_dealer_count(&self, token_count: u16);
 
 
 	#[view(tokenCount)]
@@ -717,9 +717,9 @@ pub trait ENonFungibleTokens {
 	//Récupération d'un dealer
 	#[view(getDealer)]
 	#[storage_get("dealer")]
-	fn get_dealer(&self,  dealer_id: u64) -> Dealer;
+	fn get_dealer(&self,  dealer_id: u16) -> Dealer;
 	#[storage_set("dealer")]
-	fn set_dealer(&self, dealer_id: u64, dealer: &Dealer);
+	fn set_dealer(&self, dealer_id: u16, dealer: &Dealer);
 
 
 
