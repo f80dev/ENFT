@@ -230,12 +230,11 @@ pub trait ENonFungibleTokens {
 
 	fn send_money(&self,token:&Token,dest:&Address,amount:BigUint,comment:&[u8]) {
 		if token.money.is_egld() {
-			self.send().direct_egld(dest,&(amount*BigUint::from(10000000000000000u64)),comment);
+			self.send().direct_egld(dest,&amount,comment);
 		} else {
-			self.send().direct(dest, &token.money, &(amount*BigUint::from(10000000000000000u64)), comment);
+			self.send().direct(dest, &token.money, &amount, comment);
 		}
 	}
-
 
 
 	//Retourne le contenu de la propriété secret du token en échange d'une vérification
@@ -517,9 +516,12 @@ pub trait ENonFungibleTokens {
 	//Fonction d'achat d'un token
 	//token_id: désigne le token à acheter
 	//dealer: déclare le vendeur qui à fait la vente. Cela permet au système de récupéré le prix avec la commission et de procéder au reversement
-	#[payable("*")]
+	#[payable("EGLD")]
 	#[endpoint]
-	fn buy(&self, #[payment] payment: BigUint, #[payment_token] _pay_token: TokenIdentifier,token_id: u64,dealer:Address) -> SCResult<()> {
+	fn buy(&self, #[payment] payment: BigUint,token_id: u64,dealer:Address) -> SCResult<()> {
+
+		//let (payment, _pay_token)=self.call_value().payment_token_pair();
+
 
 		require!(token_id < self.get_total_minted(), "E28: Ce token n'existe pas");
 		let mut token = self.get_token(token_id);
@@ -539,8 +541,15 @@ pub trait ENonFungibleTokens {
 		require!(token.properties & 0b00000100>0 || dealer!=Address::zero() ,"E31: La vente directe n'est pas autorisé");
 		require!(dealer==Address::zero() || idx<1000 ,"E32: Le revendeur n'est pas autorisé");
 
+
+
+
 		//calcul du payment au owner
-		let payment_for_owner=payment-BigUint::from(payment_for_dealer);
+		let mut payment_for_owner=payment-BigUint::from(payment_for_dealer);
+		//Dans le cas d'un ESDT on corrige la valeur de payment en attendant de savoir comment la passer en argument depuis python
+		if token.money.is_esdt() {
+			payment_for_owner=BigUint::from(token.price as u64)-BigUint::from(payment_for_dealer);
+		}
 		require!(payment_for_owner >= BigUint::from(token.price.clone() as u64),"E33: Paiement du propriétaire inferieur au prix du token");
 
 
@@ -623,7 +632,7 @@ pub trait ENonFungibleTokens {
 				}
 
 				item.append(&mut price.to_be_bytes().to_vec());
-				item.append(&mut token.money.as_esdt_identifier().to_vec());
+				item.append(&mut token.money.as_name().to_vec());
 
 				item.append(&mut token.owner.to_vec());
 				item.push(has_secret);
