@@ -17,10 +17,10 @@ ADDRESS=$(erdpy data load --key=address)
 DEPLOY_TRANSACTION=$(erdpy data load --key=deployTransaction)
 ARGUMENTS=""
 
-#PROXY=https://testnet-api.elrond.com
+#PROXY=https://testnet-gateway.elrond.com
 #CHAINID="T"
 
-PROXY=https://devnet-api.elrond.com
+PROXY=https://devnet-gateway.elrond.com
 CHAINID="D"
 
 #PROXY=http://161.97.75.165:7950

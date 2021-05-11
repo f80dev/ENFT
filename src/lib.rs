@@ -33,6 +33,23 @@ pub trait ENonFungibleTokens {
 	// 	return secret;
 	// }
 
+	fn int_to_str(&self,mut x:u64) -> Vec<u8> {
+		let mut rc=Vec::new();
+
+		let mut exp=10000000000000000u64;
+
+		while exp>1 {
+			let elt=x/exp;
+			let ch:u8=elt.to_le_bytes()[0]+48u8;
+			rc.push(ch);
+			x=x-elt*exp;
+			exp=exp/10u64;
+		}
+
+		return rc;
+
+	}
+
 
 	/// Creates new tokens and sets their ownership to the specified account.
 	/// Only the contract owner may call this function.
@@ -52,7 +69,6 @@ pub trait ENonFungibleTokens {
 			gift:u16,
 			money:TokenIdentifier
 	) -> SCResult<u64> {
-		// let dec_secret=self.decrypt(secret);
 
 		let caller=self.blockchain().get_caller();
 		require!(count>0,"E01: At least one token must be mined");
@@ -60,7 +76,11 @@ pub trait ENonFungibleTokens {
 		require!(min_markup <= max_markup,"E03: L'interval de commission est incorrect");
 		//La limite du miner_ratio est à 10000 car on multiplie par 100 pour autoriser un pourcentage à 2 décimal
 		require!(miner_ratio<=10000,"E04: La part du mineur doit etre entre 0 et 100");
-		require!(payment>=BigUint::from(count*gift as u64),"E05: Transfert de fond insuffisant pour le token");
+
+		if money.is_egld() {
+			require!(payment>=BigUint::from(count*gift as u64),"E05: Transfert de fond insuffisant pour le token");
+		}
+
 
 		let token_id=self.perform_mint(count,caller,new_token_title,new_token_description,secret,initial_price,min_markup,max_markup,properties,miner_ratio,gift,&money);
 
@@ -134,9 +154,10 @@ pub trait ENonFungibleTokens {
 				return Ok(());
 			}
 		}
-
 		sc_error!("E14: Only the owner or the approved account may transfer the token!")
 	}
+
+
 
 	
 	// Méthode privée utilisé pour effectivement créer le token
@@ -167,7 +188,7 @@ pub trait ENonFungibleTokens {
 				title:new_token_title.to_vec(),
 				description:new_token_description.to_vec(),
 				secret:secret.to_vec(),
-				state:0 as u8,
+				state:0u8,
 				min_markup:min_markup,
 				max_markup:max_markup,
 				dealer_ids:Vec::new(),
@@ -176,7 +197,6 @@ pub trait ENonFungibleTokens {
 				miner_ratio:miner_ratio,
 				money:money.clone()
 			};
-
 			self.set_token(id, &token);
 		}
 
@@ -196,7 +216,6 @@ pub trait ENonFungibleTokens {
 
 
 	fn perform_burn(self,token_id: u64,token: &mut Token) -> bool {
-
 		if token.gift>0 {
 			self.send().direct_egld(
 				&token.miner,
@@ -225,8 +244,11 @@ pub trait ENonFungibleTokens {
 		self.perform_burn(token_id, &mut token);
 
 		return Ok(());
-
 	}
+
+
+
+
 
 	fn send_money(&self,token:&Token,dest:&Address,amount:BigUint,comment:&[u8]) {
 		if token.money.is_egld() {
@@ -237,29 +259,41 @@ pub trait ENonFungibleTokens {
 	}
 
 
+
+
 	//Retourne le contenu de la propriété secret du token en échange d'une vérification
 	//que l'appelant est bien propriétaire du token
+	//Si Response est non vide et Gift positif alors si response == secret on transfert le gift
 	#[endpoint]
-	fn open(&self, token_id: u64) -> SCResult<Vec<u8>> {
+	fn open(&self, token_id: u64, response: &Vec<u8>) -> SCResult<Vec<u8>> {
 		require!(token_id < self.get_total_minted(), "Token does not exist!");
 		let mut token=self.get_token(token_id);
 
 		let caller = self.blockchain().get_caller();
 		require!(caller == token.owner,"E10: Seul le propriétaire peut ouvrir le token");
-		require!(token.secret.len()>0,"E11: Ce token ne contient pas de secret");
+		require!(token.secret.len()>0 || token.gift>0,"E11: Ce token ne contient pas de secret");
 
 		//let secret=mc.decrypt_base64_to_string(&token.secret).unwrap();
 		//TODO: mettre en place le décryptage du secret
 		//secret=self.decrypt(&secret);
 
-		let secret=token.secret.clone();
+		let mut secret=token.secret.clone();
 		//https://docs.rs/openssl/0.10.32/openssl/rsa/index.html
 		//let secret=v3::decrypt("secret",&enc_data);
 
 		if token.gift>0 {
-			self.send_money(&token,&token.owner,BigUint::from(token.gift as u64),b"Owner pay");
-			token.gift=0;
-			self.set_token(token_id,&token);
+			if token.properties & 0b00010000==0 || self.vec_equal(&response,&secret) {
+				self.send_money(&token,&token.owner,BigUint::from(10000000000000000*token.gift as u64),b"Owner pay");
+				token.gift=0;
+				self.set_token(token_id,&token);
+			}
+
+			if token.properties & 0b00010000>0 {
+				if self.vec_equal(&response,&secret)
+					{secret=Vec::from("Gagnez");}
+				else
+					{secret=Vec::from("Perdu");}
+			}
 		}
 
 		if token.properties & 0b00001000>0 {
@@ -548,10 +582,10 @@ pub trait ENonFungibleTokens {
 		let mut payment_for_owner=payment-BigUint::from(payment_for_dealer);
 		//Dans le cas d'un ESDT on corrige la valeur de payment en attendant de savoir comment la passer en argument depuis python
 		if token.money.is_esdt() {
-			payment_for_owner=BigUint::from(token.price as u64)-BigUint::from(payment_for_dealer);
+			payment_for_owner=BigUint::from(10000000000000000*token.price as u64)-BigUint::from(payment_for_dealer);
+		} else {
+			require!(payment_for_owner >= BigUint::from(token.price.clone() as u64),"E33: Paiement du propriétaire inferieur au prix du token");
 		}
-		require!(payment_for_owner >= BigUint::from(token.price.clone() as u64),"E33: Paiement du propriétaire inferieur au prix du token");
-
 
 		if dealer!=Address::zero() && payment_for_dealer>0 {
 			//On retribue le mineur sur la commission du distributeur
@@ -588,6 +622,15 @@ pub trait ENonFungibleTokens {
 		return rc;
 	}
 
+
+
+	fn vec_equal(&self,va: &Vec<u8>, vb: &Vec<u8>) -> bool {
+		if va.len()!= vb.len() {return false};
+		for i in 0..va.len() {
+			if va[i]!=vb[i] {return false;}
+		}
+		return true;
+	}
 
 
 	//Récupérer l'ensemble des tokens en appliquant les filtres sauf si celui est à la valeur 0x0
@@ -627,7 +670,7 @@ pub trait ENonFungibleTokens {
 				}
 
 				let mut has_secret=0u8;
-				if token.secret.len()>1 || token.gift>0 {
+				if token.secret.len()>1 || (token.secret.len()>0 && token.secret[0]>0) || token.gift>0 {
 					has_secret=1u8;
 				}
 
