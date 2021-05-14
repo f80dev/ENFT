@@ -67,13 +67,17 @@ pub trait ENonFungibleTokens {
 			properties:u8,
 			miner_ratio:u16,
 			gift:u16,
+			opt_lot:u8,
 			money:TokenIdentifier
 	) -> SCResult<u64> {
 
 		let caller=self.blockchain().get_caller();
+		require!(opt_lot==0 || (opt_lot==1 && count>1 && gift>0),"Le reglage de opt_lot est incorrect");
+
 		require!(count>0,"E01: At least one token must be mined");
 		require!(new_token_title.len()+new_token_description.len() > 0,"E02: Title & description can't be empty together");
 		require!(min_markup <= max_markup,"E03: L'interval de commission est incorrect");
+
 		//La limite du miner_ratio est à 10000 car on multiplie par 100 pour autoriser un pourcentage à 2 décimal
 		require!(miner_ratio<=10000,"E04: La part du mineur doit etre entre 0 et 100");
 
@@ -81,8 +85,7 @@ pub trait ENonFungibleTokens {
 			require!(payment>=BigUint::from(count*gift as u64),"E05: Transfert de fond insuffisant pour le token");
 		}
 
-
-		let token_id=self.perform_mint(count,caller,new_token_title,new_token_description,secret,initial_price,min_markup,max_markup,properties,miner_ratio,gift,&money);
+		let token_id=self.perform_mint(count,caller,new_token_title,new_token_description,secret,initial_price,min_markup,max_markup,properties,miner_ratio,gift,opt_lot,&money);
 
 		Ok(token_id)
 	}
@@ -173,18 +176,30 @@ pub trait ENonFungibleTokens {
 					properties:u8,
 					miner_ratio:u16,
 					gift:u16,
+					opt_lot:u8,
 					money: &TokenIdentifier) -> u64 {
 		let new_owner_current_total = self.get_token_count(&new_token_owner);
 		let total_minted = self.get_total_minted();
 		let first_new_id = total_minted;
 		let last_new_id = total_minted + count;
 
+		let mut set_gift=gift;
 		for id in first_new_id..last_new_id {
+			if opt_lot==1 {
+				if gift>0 {
+					if id % count == 0 {
+						set_gift = gift;
+					} else {
+						set_gift = 0;
+					}
+				}
+			}
+
 			let token = Token {
 				owner:new_token_owner.clone(),
 				miner:new_token_owner.clone(),
 				price:new_token_price.clone(),
-				gift:gift,
+				gift:set_gift,
 				title:new_token_title.to_vec(),
 				description:new_token_description.to_vec(),
 				secret:secret.to_vec(),
@@ -197,6 +212,7 @@ pub trait ENonFungibleTokens {
 				miner_ratio:miner_ratio,
 				money:money.clone()
 			};
+
 			self.set_token(id, &token);
 		}
 
@@ -204,8 +220,6 @@ pub trait ENonFungibleTokens {
 		self.set_token_count(&new_token_owner, new_owner_current_total + count);
 		return last_new_id;
 	}
-
-
 
 
 
@@ -217,11 +231,8 @@ pub trait ENonFungibleTokens {
 
 	fn perform_burn(self,token_id: u64,token: &mut Token) -> bool {
 		if token.gift>0 {
-			self.send().direct_egld(
-				&token.miner,
-				&BigUint::from(token.gift as u64*10000000000000000),
-				b"Miner refund"
-			);
+			//Remboursement du créateur
+			self.send_money(&token,&token.miner,BigUint::from(token.gift as u64*10000000000000000),b"Miner refund");
 		}
 
 		token.miner=Address::zero();
@@ -282,17 +293,18 @@ pub trait ENonFungibleTokens {
 		//let secret=v3::decrypt("secret",&enc_data);
 
 		if token.gift>0 {
-			if token.properties & 0b00010000==0 || self.vec_equal(&response,&secret) {
+			if token.properties & 0b00010000==0 || self.vec_equal(response,&secret) {
 				self.send_money(&token,&token.owner,BigUint::from(10000000000000000*token.gift as u64),b"Owner pay");
 				token.gift=0;
 				self.set_token(token_id,&token);
 			}
 
 			if token.properties & 0b00010000>0 {
-				if self.vec_equal(&response,&secret)
-					{secret=Vec::from("Gagnez");}
-				else
-					{secret=Vec::from("Perdu");}
+				if self.vec_equal(&response,&secret) {
+					secret=Vec::from("Gagnez");
+				} else {
+					secret=Vec::from("Perdu");
+				}
 			}
 		}
 
@@ -355,6 +367,7 @@ pub trait ENonFungibleTokens {
 		require!(dealer_id < self.get_dealer_count(), "Dealer not listed");
 
 		let mut dealer=self.get_dealer(dealer_id);
+
 		dealer.miners.push(miner_addr.clone());
 		self.set_dealer(dealer_id,&dealer);
 
