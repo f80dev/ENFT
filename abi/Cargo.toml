@@ -1,15 +1,15 @@
 [package]
-name = "e-non-fungible-tokens-abi"
+name = "enonfungibletokens-abi"
 version = "0.0.0"
 authors = ["andrei-marinica <andrei.marinica@elrond.com>"]
 edition = "2018"
 publish = false
 
-[dependencies.e-non-fungible-tokens]
+[dependencies.enonfungibletokens]
 path = ".."
 
 [dependencies.elrond-wasm]
-version = "0.15.1"
+version = "0.16.0"
 
 [dependencies.elrond-wasm-debug]
-version = "0.15.1"
+version = "0.16.0"

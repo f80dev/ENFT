@@ -15,7 +15,7 @@ use token::Token;
 use dealer::Dealer;
 
 
-#[elrond_wasm_derive::contract(ENonFungibleTokensImpl)]
+#[elrond_wasm_derive::contract]
 pub trait ENonFungibleTokens {
 
 	//Initialisation du SC
@@ -56,7 +56,7 @@ pub trait ENonFungibleTokens {
 	#[payable("EGLD")]
 	#[endpoint]
 	fn mint(&self,
-			#[payment] payment: BigUint,
+			#[payment] payment: Self::BigUint,
 			count: u64,
 			new_token_title: &Vec<u8>,
 			new_token_description: &Vec<u8>,
@@ -82,7 +82,7 @@ pub trait ENonFungibleTokens {
 		require!(miner_ratio<=10000,"E04: La part du mineur doit etre entre 0 et 100");
 
 		if money.is_egld() {
-			require!(payment>=BigUint::from(count*gift as u64),"E05: Transfert de fond insuffisant pour le token");
+			require!(payment>=Self::BigUint::from(count*gift as u64),"E05: Transfert de fond insuffisant pour le token");
 		}
 
 		let token_id=self.perform_mint(count,caller,new_token_title,new_token_description,secret,initial_price,min_markup,max_markup,properties,miner_ratio,gift,opt_lot,&money);
@@ -232,7 +232,7 @@ pub trait ENonFungibleTokens {
 	fn perform_burn(self,token_id: u64,token: &mut Token) -> bool {
 		if token.gift>0 {
 			//Remboursement du créateur
-			self.send_money(&token,&token.miner,BigUint::from(token.gift as u64*10000000000000000),b"Miner refund");
+			self.send_money(&token,&token.miner,Self::BigUint::from(token.gift as u64*10000000000000000),b"Miner refund");
 		}
 
 		token.miner=Address::zero();
@@ -261,7 +261,7 @@ pub trait ENonFungibleTokens {
 
 
 
-	fn send_money(&self,token:&Token,dest:&Address,amount:BigUint,comment:&[u8]) {
+	fn send_money(&self,token:&Token,dest:&Address,amount:Self::BigUint,comment:&[u8]) {
 		if token.money.is_egld() {
 			self.send().direct_egld(dest,&amount,comment);
 		} else {
@@ -294,7 +294,7 @@ pub trait ENonFungibleTokens {
 
 		if token.gift>0 {
 			if token.properties & 0b00010000==0 || self.vec_equal(response,&secret) {
-				self.send_money(&token,&token.owner,BigUint::from(10000000000000000*token.gift as u64),b"Owner pay");
+				self.send_money(&token,&token.owner,Self::BigUint::from(10000000000000000*token.gift as u64),b"Owner pay");
 				token.gift=0;
 				self.set_token(token_id,&token);
 			}
@@ -362,7 +362,7 @@ pub trait ENonFungibleTokens {
 
 	//Ajouter un miner approuvé à un dealer
 	#[endpoint]
-	fn add_miner(&self,  miner_addr: &Address,ipfs_token:BigUint) -> SCResult<()> {
+	fn add_miner(&self,  miner_addr: &Address,ipfs_token:Self::BigUint) -> SCResult<()> {
 		let dealer_id=self.find_dealer_by_addr(&self.blockchain().get_caller());
 		require!(dealer_id < self.get_dealer_count(), "Dealer not listed");
 
@@ -565,7 +565,7 @@ pub trait ENonFungibleTokens {
 	//dealer: déclare le vendeur qui à fait la vente. Cela permet au système de récupéré le prix avec la commission et de procéder au reversement
 	#[payable("EGLD")]
 	#[endpoint]
-	fn buy(&self, #[payment] payment: BigUint,token_id: u64,dealer:Address) -> SCResult<()> {
+	fn buy(&self, #[payment] payment: Self::BigUint,token_id: u64,dealer:Address) -> SCResult<()> {
 
 		//let (payment, _pay_token)=self.call_value().payment_token_pair();
 
@@ -592,24 +592,24 @@ pub trait ENonFungibleTokens {
 
 
 		//calcul du payment au owner
-		let mut payment_for_owner=payment-BigUint::from(payment_for_dealer);
+		let mut payment_for_owner=payment-Self::BigUint::from(payment_for_dealer);
 		//Dans le cas d'un ESDT on corrige la valeur de payment en attendant de savoir comment la passer en argument depuis python
 		if token.money.is_esdt() {
-			payment_for_owner=BigUint::from(10000000000000000*token.price as u64)-BigUint::from(payment_for_dealer);
+			payment_for_owner=Self::BigUint::from(10000000000000000*token.price as u64)-Self::BigUint::from(payment_for_dealer);
 		} else {
-			require!(payment_for_owner >= BigUint::from(token.price.clone() as u64),"E33: Paiement du propriétaire inferieur au prix du token");
+			require!(payment_for_owner >= Self::BigUint::from(token.price.clone() as u64),"E33: Paiement du propriétaire inferieur au prix du token");
 		}
 
 		if dealer!=Address::zero() && payment_for_dealer>0 {
 			//On retribue le mineur sur la commission du distributeur
 			if token.miner_ratio>0 {
 				let payment_for_miner=1000000000000*token.dealer_markup[idx] as u64*token.miner_ratio as u64;
-				self.send_money(&token,&token.miner,BigUint::from(payment_for_miner),b"miner pay");
+				self.send_money(&token,&token.miner,Self::BigUint::from(payment_for_miner),b"miner pay");
 				payment_for_dealer=payment_for_dealer-payment_for_miner;
 			}
 
 			//Transaction issue d'un revendeur
-			self.send_money(&token,&dealer,BigUint::from(payment_for_dealer),b"dealer pay");
+			self.send_money(&token,&dealer,Self::BigUint::from(payment_for_dealer),b"dealer pay");
 		}
 
 		if payment_for_owner>0 {
@@ -744,7 +744,7 @@ pub trait ENonFungibleTokens {
 
 
 	#[storage_mapper("ipfs")]
-	fn ipfs_map(&self) -> MapMapper<Self::Storage, Address, BigUint>;
+	fn ipfs_map(&self) -> MapMapper<Self::Storage, Address, Self::BigUint>;
 
 
 	#[view(dealerCount)]

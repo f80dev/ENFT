@@ -1,5 +1,5 @@
 [package]
-name = "e-non-fungible-tokens-wasm"
+name = "enonfungibletokens-wasm"
 version = "0.0.0"
 edition = "2018"
 
@@ -16,11 +16,11 @@ lto = true
 debug = false
 panic = "abort"
 
-[dependencies.e-non-fungible-tokens]
+[dependencies.enonfungibletokens]
 features = [ "wasm-output-mode",]
 default-features = false
 path = ".."
 
 [dependencies.elrond-wasm-output]
-version = "0.15.1"
+version = "0.16.0"
 features = [ "wasm-output-mode",]

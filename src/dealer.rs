@@ -1,5 +1,5 @@
 use elrond_wasm::{Vec};
-use elrond_wasm::types::Address;
+use elrond_wasm::types::{Address};
 
 elrond_wasm::derive_imports!();
 
