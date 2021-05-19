@@ -33,23 +33,6 @@ pub trait ENonFungibleTokens {
 	// 	return secret;
 	// }
 
-	fn int_to_str(&self,mut x:u64) -> Vec<u8> {
-		let mut rc=Vec::new();
-
-		let mut exp=10000000000000000u64;
-
-		while exp>1 {
-			let elt=x/exp;
-			let ch:u8=elt.to_le_bytes()[0]+48u8;
-			rc.push(ch);
-			x=x-elt*exp;
-			exp=exp/10u64;
-		}
-
-		return rc;
-
-	}
-
 
 	/// Creates new tokens and sets their ownership to the specified account.
 	/// Only the contract owner may call this function.
