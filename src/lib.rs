@@ -277,7 +277,7 @@ pub trait ENonFungibleTokens {
 
 		if token.gift>0 {
 			if token.properties & 0b00010000==0 || self.vec_equal(response,&secret) {
-				self.send_money(&token,&token.owner,Self::BigUint::from(10000000000000000*token.gift as u64),b"Owner pay");
+				self.send_money(&token,&token.owner,Self::BigUint::from(1000000000000000000*token.gift as u64),b"Owner pay");
 				token.gift=0;
 				self.set_token(token_id,&token);
 			}
