@@ -69,8 +69,7 @@ pub trait ENonFungibleTokens {
 		}
 
 		let token_id=self.perform_mint(count,caller,new_token_title,new_token_description,secret,initial_price,min_markup,max_markup,properties,miner_ratio,gift,opt_lot,&money);
-
-		Ok(token_id)
+		return Ok(token_id)
 	}
 
 
@@ -248,7 +247,7 @@ pub trait ENonFungibleTokens {
 		if token.money.is_egld() {
 			self.send().direct_egld(dest,&amount,comment);
 		} else {
-			self.send().direct(dest, &token.money, &amount, comment);
+			self.send().direct(dest, &token.money, &(amount*Self::BigUint::from(10u64)), comment);
 		}
 	}
 
@@ -277,7 +276,7 @@ pub trait ENonFungibleTokens {
 
 		if token.gift>0 {
 			if token.properties & 0b00010000==0 || self.vec_equal(response,&secret) {
-				self.send_money(&token,&token.owner,Self::BigUint::from(1000000000000000000*token.gift as u64),b"Owner pay");
+				self.send_money(&token,&token.owner,Self::BigUint::from(10000000000000000*token.gift as u64),b"pay for gift");
 				token.gift=0;
 				self.set_token(token_id,&token);
 			}
@@ -399,12 +398,11 @@ pub trait ENonFungibleTokens {
 	//Ajout un nouveau distributeur
 	//state=0 open / 1 close
 	#[endpoint]
-	fn new_dealer(&self,  ipfs: &Vec<u8>) -> SCResult<u16> {
+	fn new_dealer(&self) -> SCResult<u16> {
 		let addr=self.blockchain().get_caller();
 		let idx=self.find_dealer_by_addr(&addr);
 		if idx == self.get_dealer_count() {
 			let dealer = Dealer {
-				ipfs: ipfs.to_vec(),
 				state: 0,
 				addr: addr.clone(),
 				miners: Vec::new()
@@ -458,10 +456,6 @@ pub trait ENonFungibleTokens {
 			if filter_miner==Address::zero() || dealer.miners.contains(&filter_miner) {
 				rc.append(&mut dealer.addr.to_vec());
 				rc.push(dealer.state);
-				rc.append(&mut dealer.ipfs.to_vec());
-				rc.push(0);
-				rc.push(0);
-				rc.push(0);
 			}
 		}
 
