@@ -344,7 +344,7 @@ pub trait ENonFungibleTokens {
 
 	//Ajouter un miner approuvé à un dealer
 	#[endpoint]
-	fn add_miner(&self,  miner_addr: &Address,ipfs_token:Self::BigUint) -> SCResult<()> {
+	fn add_miner(&self,  miner_addr: &Address) -> SCResult<()> {
 		let dealer_id=self.find_dealer_by_addr(&self.blockchain().get_caller());
 		require!(dealer_id < self.get_dealer_count(), "Dealer not listed");
 
@@ -353,7 +353,7 @@ pub trait ENonFungibleTokens {
 		dealer.miners.push(miner_addr.clone());
 		self.set_dealer(dealer_id,&dealer);
 
-		self.ipfs_map().insert(miner_addr.clone(),ipfs_token);
+		//self.ipfs_map().insert(miner_addr.clone(),ipfs_token);
 
 		Ok(())
 	}
@@ -435,11 +435,8 @@ pub trait ENonFungibleTokens {
 		let dealer=self.get_dealer(idx);
 		for miner in dealer.miners.iter() {
 			rc.append(&mut miner.to_vec());
-			let ipfs=self.ipfs_map().get(miner).unwrap();
-			rc.append(&mut ipfs.to_bytes_be().to_vec());
-			rc.push(0);
-			rc.push(0);
-			rc.push(0);
+			// let ipfs=self.ipfs_map().get(miner).unwrap();
+			// rc.append(&mut ipfs.to_bytes_be().to_vec());
 		}
 
 		return rc;
