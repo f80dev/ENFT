@@ -247,7 +247,7 @@ pub trait ENonFungibleTokens {
 		if token.money.is_egld() {
 			self.send().direct_egld(dest,&amount,comment);
 		} else {
-			self.send().direct(dest, &token.money, &(amount*Self::BigUint::from(10u64)), comment);
+			self.send().direct(dest, &token.money, &(amount), comment);
 		}
 	}
 
@@ -543,7 +543,6 @@ pub trait ENonFungibleTokens {
 
 		//let (payment, _pay_token)=self.call_value().payment_token_pair();
 
-
 		require!(token_id < self.get_total_minted(), "E28: Ce token n'existe pas");
 		let mut token = self.get_token(token_id);
 
@@ -561,8 +560,6 @@ pub trait ENonFungibleTokens {
 
 		require!(token.properties & 0b00000100>0 || dealer!=Address::zero() ,"E31: La vente directe n'est pas autorisé");
 		require!(dealer==Address::zero() || idx<1000 ,"E32: Le revendeur n'est pas autorisé");
-
-
 
 
 		//calcul du payment au owner
