@@ -1,9 +1,8 @@
-use elrond_wasm::{Vec};
-use elrond_wasm::types::{Address, TokenIdentifier};
+use elrond_wasm::types::{Address, TokenIdentifier,Vec};
 
 elrond_wasm::derive_imports!();
 
-#[derive(NestedEncode, NestedDecode, TopEncode, TopDecode, TypeAbi)]
+#[derive(NestedEncode, NestedDecode,TopEncode,TopDecode,TypeAbi)]
 pub struct Token {
      pub price: u32,
      pub title: Vec<u8>,

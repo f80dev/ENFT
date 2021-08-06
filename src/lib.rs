@@ -9,13 +9,14 @@
 elrond_wasm::imports!();
 elrond_wasm::derive_imports!();
 
+
 mod token;
 mod dealer;
 use token::Token;
 use dealer::Dealer;
 
 
-#[elrond_wasm_derive::contract]
+#[elrond_wasm::contract]
 pub trait ENonFungibleTokens {
 
 	//Initialisation du SC
@@ -36,8 +37,8 @@ pub trait ENonFungibleTokens {
 
 	/// Creates new tokens and sets their ownership to the specified account.
 	/// Only the contract owner may call this function.
-	#[payable("EGLD")]
 	#[endpoint]
+	#[payable("EGLD")]
 	fn mint(&self,
 			#[payment] payment: Self::BigUint,
 			count: u64,
@@ -247,7 +248,7 @@ pub trait ENonFungibleTokens {
 		if token.money.is_egld() {
 			self.send().direct_egld(dest,&amount,comment);
 		} else {
-			self.send().direct(dest, &token.money, &(amount), comment);
+			self.send().direct(dest, &token.money, 0,&(amount), comment);
 		}
 	}
 
