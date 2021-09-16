@@ -2,7 +2,7 @@
 
 #sed 's/\r$//' snippets.sh
 #cd /home/root/dev
-#erdpy contract build
+#clear && erdpy contract build
 #source snippets.sh && deploy
 #source snippets.sh && infos
 

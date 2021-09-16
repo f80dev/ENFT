@@ -1,13 +1,14 @@
 use elrond_wasm::{Vec};
-use elrond_wasm::types::{Address};
+use elrond_wasm::types::{ManagedAddress};
+use elrond_wasm::api::ManagedTypeApi;
 
 elrond_wasm::derive_imports!();
 
 #[derive(NestedEncode, NestedDecode, TopEncode, TopDecode, TypeAbi)]
-pub struct Dealer {
+pub struct Dealer<M: ManagedTypeApi> {
      pub state:u8,                   //State
-     pub addr:Address,              //Adresse
-     pub miners:Vec<Address>      //Adresses des mineurs autorisés
+     pub addr:ManagedAddress<M>,              //Adresse
+     pub miners:Vec<ManagedAddress<M>>      //Adresses des mineurs autorisés
 }
 
 

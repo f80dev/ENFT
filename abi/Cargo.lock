@@ -145,6 +145,7 @@ name = "enonfungibletokens"
 version = "0.0.1"
 dependencies = [
  "elrond-wasm",
+ "num-bigint",
 ]
 
 [[package]]
