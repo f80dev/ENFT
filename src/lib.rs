@@ -4,12 +4,13 @@
 #![no_std]
 
 elrond_wasm::imports!();
-elrond_wasm::derive_imports!();
+
 
 mod token;
 mod dealer;
-use token::Token;
 use dealer::Dealer;
+use token::Token;
+
 
 #[elrond_wasm::contract]
 pub trait ENonFungibleTokens {
@@ -60,6 +61,10 @@ pub trait ENonFungibleTokens {
 		//La limite du miner_ratio est à 10000 car on multiplie par 100 pour autoriser un pourcentage à 2 décimal
 		require!(miner_ratio<=10000,"E04: La part du mineur doit etre entre 0 et 100");
 
+		//Creation de la monnaie
+		require!(money.is_egld() || money.is_valid_esdt_identifier(),"Invalid money");
+
+
 		if money.is_egld() {
 			require!(payment>=BigUint::from(count*gift as u64),"E05: Transfert de fond insuffisant pour le token");
 		}
@@ -86,7 +91,7 @@ pub trait ENonFungibleTokens {
 
 
 
-	/// Revokes approval for the token.<br>  
+	/// Revokes approval for the token.<br>
 	/// Only the owner of the token may call this function.
 	#[endpoint]
 	fn revoke(&self, token_id: u64) -> SCResult<()> {
@@ -140,7 +145,7 @@ pub trait ENonFungibleTokens {
 
 
 
-	
+
 	// Méthode privée utilisé pour effectivement créer le token
 	//count permet de miner plusieurs tokens identique avec un seul appels
 	fn perform_mint(&self,
@@ -213,8 +218,8 @@ pub trait ENonFungibleTokens {
 			self.send_money(&token,&token.miner,BigUint::from(token.gift as u64*10000000000000000),b"Miner refund");
 		}
 
-		token.miner=Address::zero();
-		token.owner=Address::zero();
+		token.miner=self.types().address_zero();
+		token.owner=self.types().address_zero();
 		self.set_token(token_id,&token);
 
 		return true;
@@ -239,7 +244,7 @@ pub trait ENonFungibleTokens {
 
 
 
-	fn send_money(&self,token:&Token<Self::Api>,dest:&ManagedAddress,amount:BigUint,comment:&[u8]) {
+	fn send_money(&self,token:&Token<Self::Api>,dest:&ManagedAddress, amount:BigUint, comment:&[u8]) {
 		if token.money.is_egld() {
 			self.send().direct_egld(dest,&amount,comment);
 		} else {
@@ -330,7 +335,7 @@ pub trait ENonFungibleTokens {
 	//Recherche un dealer par son adresse dans un token
 	fn find_dealer_in_token(&self,dealer_addr: &ManagedAddress,token:&Token<Self::Api>) -> usize {
 		let mut rc=token.dealer_ids.len();
-		if dealer_addr != &ManagedAddress::zero() {
+		if dealer_addr != &self.types().address_zero() {
 			let addrs=self.get_dealer_addresses_for_token(&token);
 			rc=addrs.iter().position(|x| x == dealer_addr).unwrap_or(token.dealer_ids.len());
 		}
@@ -411,10 +416,10 @@ pub trait ENonFungibleTokens {
 
 
 
-	#[view(is_miner)]
-	fn is_miner(&self,  miner_addr: ManagedAddress) -> bool {
-		return self.ipfs_map().contains_key(&miner_addr);
-	}
+	// #[view(is_miner)]
+	// fn is_miner(&self,  miner_addr: ManagedAddress) -> bool {
+	// 	return self.ipfs_map().contains_key(&miner_addr);
+	// }
 
 
 
@@ -430,9 +435,9 @@ pub trait ENonFungibleTokens {
 
 		let dealer=self.get_dealer(idx);
 		for miner in dealer.miners.iter() {
-			rc.append(&mut miner.to_vec());
+			rc.append(&mut miner.to_address().to_vec());
 			// let ipfs=self.ipfs_map().get(miner).unwrap();
-			// rc.append(&mut ipfs.to_bytes_be().to_vec());
+			// rc.append(&mut ipfs.to_bytes_be().to_address().to_vec());
 		}
 
 		return rc;
@@ -441,13 +446,13 @@ pub trait ENonFungibleTokens {
 
 	//retourne l'ensemble des distributeurs référencés si l'adresse est 0x0 ou les distributeurs d'un mineur
 	#[view(dealers)]
-	fn dealers(&self,filter_miner:Address) -> Vec<u8> {
+	fn dealers(&self,filter_miner:ManagedAddress) -> Vec<u8> {
 		let mut rc=Vec::new();
 
 		for idx in 0..self.get_dealer_count() {
 			let dealer=self.get_dealer(idx);
-			if filter_miner==Address::zero() || dealer.miners.contains(&filter_miner) {
-				rc.append(&mut dealer.addr.to_vec());
+			if filter_miner==self.types().address_zero() || dealer.miners.contains(&filter_miner) {
+				rc.append(&mut dealer.addr.to_address().to_vec());
 				rc.push(dealer.state);
 			}
 		}
@@ -536,7 +541,7 @@ pub trait ENonFungibleTokens {
 	//Voir l'exemple de la fonction fund dans https://github.com/ElrondNetwork/elrond-wasm-rs/blob/master/contracts/examples/crowdfunding-esdt/src/crowdfunding_esdt.rs
 	#[payable("EGLD")]
 	#[endpoint]
-	fn buy(&self, #[payment] payment: BigUint,token_id: u64,dealer:Address) -> SCResult<()> {
+	fn buy(&self, #[payment] payment: BigUint,token_id: u64,dealer:ManagedAddress) -> SCResult<()> {
 
 		//let (payment, _pay_token)=self.call_value().payment_token_pair();
 
@@ -555,8 +560,8 @@ pub trait ENonFungibleTokens {
 			payment_for_dealer=10000000000000000*token.dealer_markup[idx] as u64;
 		}
 
-		require!(token.properties & 0b00000100>0 || dealer!=Address::zero() ,"E31: La vente directe n'est pas autorisé");
-		require!(dealer==Address::zero() || idx<1000 ,"E32: Le revendeur n'est pas autorisé");
+		require!(token.properties & 0b00000100>0 || dealer!=self.types().address_zero() ,"E31: La vente directe n'est pas autorisé");
+		require!(dealer==self.types().address_zero() || idx<1000 ,"E32: Le revendeur n'est pas autorisé");
 
 
 		//calcul du payment au owner
@@ -568,7 +573,7 @@ pub trait ENonFungibleTokens {
 			require!(payment_for_owner >= BigUint::from(token.price.clone() as u64),"E33: Paiement du propriétaire inferieur au prix du token");
 		}
 
-		if dealer!=Address::zero() && payment_for_dealer>0 {
+		if dealer!=self.types().address_zero() && payment_for_dealer>0 {
 			//On retribue le mineur sur la commission du distributeur
 			if token.miner_ratio>0 {
 				let payment_for_miner=1000000000000*token.dealer_markup[idx] as u64*token.miner_ratio as u64;
@@ -594,7 +599,7 @@ pub trait ENonFungibleTokens {
 
 
 
-	fn get_dealer_addresses_for_token(&self,token: &Token<Self::Api>) -> Vec<Address> {
+	fn get_dealer_addresses_for_token(&self,token: &Token<Self::Api>) -> Vec<ManagedAddress> {
 		let mut rc=Vec::new();
 		for i in 0..token.dealer_ids.len(){
 			let dealer=self.get_dealer(token.dealer_ids[i]);
@@ -629,9 +634,9 @@ pub trait ENonFungibleTokens {
 
 			let idx = self.find_dealer_in_token(&seller_filter,&token);
 
-			if (owner_filter == ManagedAddress::zero() || owner_filter == token.owner)
-				&& (miner_filter == ManagedAddress::zero() || miner_filter == token.miner)
-				&& (seller_filter == ManagedAddress::zero() || idx < token.dealer_ids.len() ) {
+			if (owner_filter == self.types().address_zero() || owner_filter == token.owner)
+				&& (miner_filter == self.types().address_zero() || miner_filter == token.miner)
+				&& (seller_filter == self.types().address_zero() || idx < token.dealer_ids.len() ) {
 
 				let mut item:Vec<u8>=Vec::new();
 
@@ -656,9 +661,9 @@ pub trait ENonFungibleTokens {
 				}
 
 				item.append(&mut price.to_be_bytes().to_vec());
-				item.append(&mut token.money.as_name().to_vec());
+				item.append(&mut token.money.as_name().into_vec());
 
-				item.append(&mut token.owner.to_vec());
+				item.append(&mut token.owner.to_address().to_vec());
 				item.push(has_secret);
 				item.push(token.state);
 				item.push(token.properties);
@@ -666,7 +671,7 @@ pub trait ENonFungibleTokens {
 				item.append(&mut token.max_markup.to_be_bytes().to_vec());
 				item.append(&mut markup.to_be_bytes().to_vec());
 				item.append(&mut token.miner_ratio.to_be_bytes().to_vec());
-				item.append(&mut token.miner.to_vec());
+				item.append(&mut token.miner.to_address().to_vec());
 				item.append(&mut i.to_be_bytes().to_vec()); //Identifiant du token
 
 				item.append(&mut token.title);
@@ -712,7 +717,7 @@ pub trait ENonFungibleTokens {
 
 	// #[warn(deprecated)]
 	// #[storage_mapper("ipfs")]
-	// fn ipfs_map(&self) -> MapMapper<Address, BigUint>;
+	// fn ipfs_map(&self) -> MapMapper<ManagedAddress, BigUint>;
 
 
 	#[view(dealerCount)]
@@ -750,9 +755,9 @@ pub trait ENonFungibleTokens {
 	//Récupération d'un dealer
 	#[view(getDealer)]
 	#[storage_get("dealer")]
-	fn get_dealer(&self,  dealer_id: u16) -> Dealer;
+	fn get_dealer(&self,  dealer_id: u16) -> Dealer<Self::Api>;
 	#[storage_set("dealer")]
-	fn set_dealer(&self, dealer_id: u16, dealer: &Dealer);
+	fn set_dealer(&self, dealer_id: u16, dealer: &Dealer<Self::Api>);
 
 
 

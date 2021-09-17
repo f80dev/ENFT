@@ -1,6 +1,7 @@
-use elrond_wasm::{Vec};
-use elrond_wasm::types::{ManagedAddress};
-use elrond_wasm::api::ManagedTypeApi;
+use elrond_wasm::{
+     types::{ManagedAddress,Vec},
+     api::ManagedTypeApi
+};
 
 elrond_wasm::derive_imports!();
 

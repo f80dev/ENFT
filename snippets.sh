@@ -28,23 +28,26 @@ CHAINID="D"
 
 
 deploy() {
+    clear
+    echo "Build"
     build
 
     clear
-    erdpy contract deploy --chain ${CHAINID}  --metadata-payable --project=${PROJECT} --proxy ${PROXY} --recall-nonce --pem=${ALICE} --gas-limit=150000000 --send --outfile="deploy.json"
+    echo "Déploiement"
+    erdpy contract deploy --chain=${CHAINID} --metadata-payable --project=${PROJECT} --proxy=${PROXY} --recall-nonce --pem=${ALICE} --gas-limit=150000000 --outfile="deploy.json" --arguments="" --send
 
-    TRANSACTION=$(erdpy data parse --file="deploy.json" --expression="data['emitted_tx']['hash']")
-    ADDRESS=$(erdpy data parse --file="deploy.json" --expression="data['emitted_tx']['address']")
-
-    erdpy data store --key=address --value=${ADDRESS}
-    erdpy data store --key=deployTransaction --value=${TRANSACTION}
-
-    echo "si besoin https://testnet-wallet.elrond.com"
-    echo "Transaction https://devnet-explorer.elrond.com/transactions/${TRANSACTION}"
-    echo "Transaction ${PROXY}/transaction/${TRANSACTION}"
-    echo "Smart contract address: https://devnet-explorer.elrond.com/address/${ADDRESS}"
-    echo "Smart contract address: ${PROXY}/address/${ADDRESS}"
-    echo "contract deployed ${ADDRESS}"
+#    TRANSACTION=$(erdpy data parse --file="deploy.json" --expression="data['emitted_tx']['hash']")
+#    ADDRESS=$(erdpy data parse --file="deploy.json" --expression="data['emitted_tx']['address']")
+#
+#    erdpy data store --key=address --value=${ADDRESS}
+#    erdpy data store --key=deployTransaction --value=${TRANSACTION}
+#
+#    echo "si besoin https://testnet-wallet.elrond.com"
+#    echo "Transaction https://devnet-explorer.elrond.com/transactions/${TRANSACTION}"
+#    echo "Transaction ${PROXY}/transaction/${TRANSACTION}"
+#    echo "Smart contract address: https://devnet-explorer.elrond.com/address/${ADDRESS}"
+#    echo "Smart contract address: ${PROXY}/address/${ADDRESS}"
+#    echo "contract deployed ${ADDRESS}"
 }
 
 
