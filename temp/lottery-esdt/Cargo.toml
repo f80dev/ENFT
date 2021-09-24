@@ -1,12 +1,12 @@
 [package]
-name = "enonfungibletokens"
-version = "0.0.1"
-authors = [ "hhoareau@gmail.com",]
+name = "lottery-esdt"
+version = "0.0.0"
+authors = [ "Dorin Iancu <dorin.iancu@elrond.com>",]
 edition = "2018"
 publish = false
 
 [lib]
-path = "src/lib.rs"
+path = "src/lottery.rs"
 
 [features]
 wasm-output-mode = [ "elrond-wasm-node",]

@@ -2,20 +2,30 @@
 
 #sed 's/\r$//' snippets.sh
 #cd /home/root/dev
+#pip install erdpy==1.0.18
 #clear && erdpy contract build
 #source snippets.sh && deploy
 #source snippets.sh && infos
 
+#récupération de l'environnement de développement
+#docker rm -f elrond-dev && docker pull f80hub/elrond-dev:latest
+
+#Compilation des exemples
+#cd /home/root/sample/contracts/examples/lottery-esdt
+#clear && erdpy contract build
+#erdpy --verbose contract deploy --proxy=https://devnet-gateway.elrond.com --chain=D --bytecode=./output/lottery-esdt.wasm --recall-nonce --pem=/home/root/dev/PEM/alice.pem --gas-limit=150000000 --send --outfile="deploy.json"
+
+
 USERS="./PEM"
 PROJECT="."
-
+BYTECODE="/home/root/dev/output/enonfungibletokens.wasm"
 ALICE="${USERS}/alice.pem"
 BOB="${USERS}/bob.pem"
 DAN="${USERS}/dan.epem"
 CAROL="${USERS}/carol.pem"
 ADDRESS=$(erdpy data load --key=address)
 DEPLOY_TRANSACTION=$(erdpy data load --key=deployTransaction)
-ARGUMENTS=""
+ARGUMENTS="0"
 
 #PROXY=https://testnet-gateway.elrond.com
 #CHAINID="T"
@@ -24,6 +34,7 @@ PROXY=https://devnet-gateway.elrond.com
 CHAINID="D"
 
 #PROXY=http://161.97.75.165:7950
+#PROXY=http://207.180.198.227:7950
 #CHAINID="local-testnet"
 
 
@@ -34,20 +45,21 @@ deploy() {
 
     clear
     echo "Déploiement"
-    erdpy contract deploy --chain=${CHAINID} --metadata-payable --project=${PROJECT} --proxy=${PROXY} --recall-nonce --pem=${ALICE} --gas-limit=150000000 --outfile="deploy.json" --arguments="" --send
+    #erdpy --verbose contract deploy --chain=${CHAINID} --bytecode=${BYTECODE} --metadata-payable --proxy=${PROXY} --recall-nonce --pem=${ALICE} --gas-limit=150000000 --outfile="deploy.json" --send
+    erdpy --verbose contract deploy --chain=${CHAINID} --project=${PROJECT} --arguments=${ARGUMENTS} --metadata-payable --proxy=${PROXY} --recall-nonce --pem=${ALICE} --gas-limit=150000000 --outfile="deploy.json" --send
 
-#    TRANSACTION=$(erdpy data parse --file="deploy.json" --expression="data['emitted_tx']['hash']")
-#    ADDRESS=$(erdpy data parse --file="deploy.json" --expression="data['emitted_tx']['address']")
-#
-#    erdpy data store --key=address --value=${ADDRESS}
-#    erdpy data store --key=deployTransaction --value=${TRANSACTION}
-#
-#    echo "si besoin https://testnet-wallet.elrond.com"
-#    echo "Transaction https://devnet-explorer.elrond.com/transactions/${TRANSACTION}"
-#    echo "Transaction ${PROXY}/transaction/${TRANSACTION}"
-#    echo "Smart contract address: https://devnet-explorer.elrond.com/address/${ADDRESS}"
-#    echo "Smart contract address: ${PROXY}/address/${ADDRESS}"
-#    echo "contract deployed ${ADDRESS}"
+    TRANSACTION=$(erdpy data parse --file="deploy.json" --expression="data['emitted_tx']['hash']")
+    ADDRESS=$(erdpy data parse --file="deploy.json" --expression="data['emitted_tx']['address']")
+
+    erdpy data store --key=address --value=${ADDRESS}
+    erdpy data store --key=deployTransaction --value=${TRANSACTION}
+
+    echo "si besoin https://testnet-wallet.elrond.com"
+    echo "Transaction https://devnet-explorer.elrond.com/transactions/${TRANSACTION}"
+    echo "Transaction ${PROXY}/transaction/${TRANSACTION}"
+    echo "Smart contract address: https://devnet-explorer.elrond.com/address/${ADDRESS}"
+    echo "Smart contract address: ${PROXY}/address/${ADDRESS}"
+    echo "contract deployed ${ADDRESS}"
 }
 
 

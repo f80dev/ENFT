@@ -5,23 +5,21 @@
 
 elrond_wasm::imports!();
 
-
 mod token;
 mod dealer;
 use dealer::Dealer;
 use token::Token;
 
-
 #[elrond_wasm::contract]
-pub trait ENonFungibleTokens {
+pub trait ENonFungibleTokens
+{
 
-	//Initialisation du SC
 	#[init]
-	fn init(&self) {
+	fn init(&self,initial_value: u64) {
 		let owner = self.blockchain().get_caller();
 		self.set_owner(&owner);
-		self.set_total_minted(0); //Aucun token miné
-		self.set_dealer_count(0); //Aucun distributeur
+		self.set_total_minted(initial_value); //Aucun token miné
+		self.set_dealer_count(0u16); //Aucun distributeur
 	}
 
 
@@ -31,82 +29,81 @@ pub trait ENonFungibleTokens {
 	// }
 
 
+
 	/// Creates new tokens and sets their ownership to the specified account.
 	/// Only the contract owner may call this function.
-	#[endpoint]
-	#[payable("EGLD")]
-	fn mint(&self,
-			#[payment] payment: BigUint,
-			count: u64,
-			new_token_title: &Vec<u8>,
-			new_token_description: &Vec<u8>,
-			secret: &Vec<u8>,
-			initial_price: u32,
-			min_markup:u16,
-			max_markup:u16,
-			properties:u8,
-			miner_ratio:u16,
-			gift:u16,
-			opt_lot:u8,
-			money:TokenIdentifier
-	) -> SCResult<u64> {
-
-		let caller=self.blockchain().get_caller();
-		require!(opt_lot==0 || (opt_lot==1 && count>1 && gift>0),"Le reglage de opt_lot est incorrect");
-
-		require!(count>0,"E01: At least one token must be mined");
-		require!(new_token_title.len()+new_token_description.len() > 0,"E02: Title & description can't be empty together");
-		require!(min_markup <= max_markup,"E03: L'interval de commission est incorrect");
-
-		//La limite du miner_ratio est à 10000 car on multiplie par 100 pour autoriser un pourcentage à 2 décimal
-		require!(miner_ratio<=10000,"E04: La part du mineur doit etre entre 0 et 100");
-
-		//Creation de la monnaie
-		require!(money.is_egld() || money.is_valid_esdt_identifier(),"Invalid money");
-
-
-		if money.is_egld() {
-			require!(payment>=BigUint::from(count*gift as u64),"E05: Transfert de fond insuffisant pour le token");
-		}
-
-		let token_id=self.perform_mint(count,caller,new_token_title,new_token_description,secret,initial_price,min_markup,max_markup,properties,miner_ratio,gift,opt_lot,&money);
-		return Ok(token_id)
-	}
+	// #[endpoint]
+	// #[payable("EGLD")]
+	// fn mint(&self,
+	// 		#[payment] payment: BigUint,
+	// 		count: u64,
+	// 		new_token_title: &Vec<u8>,
+	// 		new_token_description: &Vec<u8>,
+	// 		secret: &Vec<u8>,
+	// 		initial_price: u32,
+	// 		min_markup:u16,
+	// 		max_markup:u16,
+	// 		properties:u8,
+	// 		miner_ratio:u16,
+	// 		gift:u16,
+	// 		opt_lot:u8,
+	// 		money:TokenIdentifier
+	// ) -> SCResult<u64> {
+	//
+	// 	let caller=self.blockchain().get_caller();
+	// 	require!(opt_lot==0 || (opt_lot==1 && count>1 && gift>0),"Le reglage de opt_lot est incorrect");
+	// 	require!(count>0,"E01: At least one token must be mined");
+	// 	require!(new_token_title.len()+new_token_description.len() > 0,"E02: Title & description can't be empty together");
+	// 	require!(min_markup <= max_markup,"E03: L'interval de commission est incorrect");
+	//
+	// 	//La limite du miner_ratio est à 10000 car on multiplie par 100 pour autoriser un pourcentage à 2 décimal
+	// 	require!(miner_ratio<=10000,"E04: La part du mineur doit etre entre 0 et 100");
+	//
+	// 	//Creation de la monnaie
+	// 	require!(money.is_egld() || money.is_valid_esdt_identifier(),"Invalid money");
+	//
+	// 	if money.is_egld() {
+	// 		require!(payment>=BigUint::from(count*gift as u64),"E05: Transfert de fond insuffisant pour le token");
+	// 	}
+	//
+	// 	let token_id=self.perform_mint(count,caller,new_token_title,new_token_description,secret,initial_price,min_markup,max_markup,properties,miner_ratio,gift,opt_lot,&money);
+	// 	return Ok(token_id)
+	// }
 
 
 
 
 	/// Approves an account to transfer the token on behalf of its owner.<br>
 	/// Only the owner of the token may call this function.
-	#[endpoint]
-	fn approve(&self, token_id: u64, approved_address: ManagedAddress) -> SCResult<()> {
-		let token=self.get_token(token_id);
-		require!(token_id < self.get_total_minted(), "E06: Token does not exist!");
-		require!(self.blockchain().get_caller() == token.owner ,"E07: Only the token owner can approve!");
-
-		self.set_approval(token_id, &approved_address);
-
-		Ok(())
-	}
+	// #[endpoint]
+	// fn approve(&self, token_id: u64, approved_address: ManagedAddress) -> SCResult<()> {
+	// 	let token=self.get_token(token_id);
+	// 	require!(token_id < self.get_total_minted(), "E06: Token does not exist!");
+	// 	require!(self.blockchain().get_caller() == token.owner ,"E07: Only the token owner can approve!");
+	//
+	// 	self.set_approval(token_id, &approved_address);
+	//
+	// 	Ok(())
+	// }
 
 
 
 	/// Revokes approval for the token.<br>
 	/// Only the owner of the token may call this function.
-	#[endpoint]
-	fn revoke(&self, token_id: u64) -> SCResult<()> {
-		require!(token_id < self.get_total_minted(), "E08: Token does not exist!");
-
-		let token=self.get_token(token_id);
-		require!(self.blockchain().get_caller() == token.owner,"E09: Only the token owner can revoke approval!");
-
-		if !self.approval_is_empty(token_id) {
-			//TODO: on considère les approuvés comme des distributeurs, on doit donc supprimer le distributeur
-			self.perform_revoke_approval(token_id);
-		}
-
-		Ok(())
-	}
+	// #[endpoint]
+	// fn revoke(&self, token_id: u64) -> SCResult<()> {
+	// 	require!(token_id < self.get_total_minted(), "E08: Token does not exist!");
+	//
+	// 	let token=self.get_token(token_id);
+	// 	require!(self.blockchain().get_caller() == token.owner,"E09: Only the token owner can revoke approval!");
+	//
+	// 	if !self.approval_is_empty(token_id) {
+	// 		//TODO: on considère les approuvés comme des distributeurs, on doit donc supprimer le distributeur
+	// 		self.perform_revoke_approval(token_id);
+	// 	}
+	//
+	// 	Ok(())
+	// }
 
 
 
@@ -416,14 +413,14 @@ pub trait ENonFungibleTokens {
 
 
 
-	// #[view(is_miner)]
-	// fn is_miner(&self,  miner_addr: ManagedAddress) -> bool {
-	// 	return self.ipfs_map().contains_key(&miner_addr);
-	// }
+	#[view(is_miner)]
+	fn is_miner(&self,  miner_addr: ManagedAddress) -> bool {
+		return self.ipfs_map().contains_key(&miner_addr);
+	}
 
 
 
-		//Retourne la liste des mineurs approuvé par un distributeurs (separateur de liste : 000000)
+	//Retourne la liste des mineurs approuvé par un distributeurs (separateur de liste : 000000)
 	#[view(miners)]
 	fn miners(&self,  dealer_addr: ManagedAddress) -> Vec<u8> {
 
@@ -686,7 +683,6 @@ pub trait ENonFungibleTokens {
 
 
 
-
 	#[view(contractOwner)]
 	#[storage_get("owner")]
 	fn get_owner(&self) -> ManagedAddress;
@@ -694,18 +690,15 @@ pub trait ENonFungibleTokens {
 	fn set_owner(&self, owner: &ManagedAddress);
 
 
-	// #[storage_get("private_key")]
-	// fn get_private_key(&self) -> RSAPrivateKey;
-	// #[storage_set("owner")]
-	// fn set_private_key(&self, key: &RSAPrivateKey);
 
 
-	// Fonctions utilisées pour les NFT
-	// #[view(tokenOwner)]
-	// #[storage_get("tokenOwner")]
-	// fn get_token_owner(&self, token_id: u64) -> ManagedAddress;
-	// #[storage_set("tokenOwner")]
-	// fn set_token_owner(&self, token_id: u64, owner: &ManagedAddress);
+	//Fonctions utilisées pour les NFT
+	#[view(tokenOwner)]
+	#[storage_get("tokenOwner")]
+	fn get_token_owner(&self, token_id: u64) -> ManagedAddress;
+	#[storage_set("tokenOwner")]
+	fn set_token_owner(&self, token_id: u64, owner: &ManagedAddress);
+
 
 
 	//Retourne le nombre total de token minés
@@ -715,9 +708,9 @@ pub trait ENonFungibleTokens {
 	#[storage_set("totalMinted")]
 	fn set_total_minted(&self, total_minted: u64);
 
-	// #[warn(deprecated)]
-	// #[storage_mapper("ipfs")]
-	// fn ipfs_map(&self) -> MapMapper<ManagedAddress, BigUint>;
+	#[warn(deprecated)]
+	#[storage_mapper("ipfs")]
+	fn ipfs_map(&self) -> MapMapper<ManagedAddress, BigUint>;
 
 
 	#[view(dealerCount)]
@@ -752,7 +745,7 @@ pub trait ENonFungibleTokens {
 
 
 
-	//Récupération d'un dealer
+	// Récupération d'un dealer
 	#[view(getDealer)]
 	#[storage_get("dealer")]
 	fn get_dealer(&self,  dealer_id: u16) -> Dealer<Self::Api>;
@@ -761,7 +754,7 @@ pub trait ENonFungibleTokens {
 
 
 
-	//Fonction d'approbation pour maintient de compatibilité avec les NFT
+	// Fonction d'approbation pour maintient de compatibilité avec les NFT
 	#[storage_is_empty("approval")]
 	fn approval_is_empty(&self, token_id: u64) -> bool;
 	#[view(approval)]

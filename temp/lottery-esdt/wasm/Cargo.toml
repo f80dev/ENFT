@@ -1,13 +1,12 @@
 [package]
-name = "enonfungibletokens-wasm"
+name = "lottery-esdt-wasm"
 version = "0.0.0"
+authors = [ "Dorin Iancu <dorin.iancu@elrond.com>",]
 edition = "2018"
-publish=false
-authors = [ "hhoareau@gmail.com",]
+publish = false
 
 [lib]
 crate-type = [ "cdylib",]
-
 
 [profile.release]
 codegen-units = 1
@@ -16,8 +15,7 @@ lto = true
 debug = false
 panic = "abort"
 
-
-[dependencies.enonfungibletokens]
+[dependencies.lottery-esdt]
 features = [ "wasm-output-mode",]
 default-features = false
 path = ".."
