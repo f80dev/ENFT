@@ -32,43 +32,45 @@ pub trait ENonFungibleTokens
 
 	/// Creates new tokens and sets their ownership to the specified account.
 	/// Only the contract owner may call this function.
-	// #[endpoint]
-	// #[payable("EGLD")]
-	// fn mint(&self,
-	// 		#[payment] payment: BigUint,
-	// 		count: u64,
-	// 		new_token_title: &Vec<u8>,
-	// 		new_token_description: &Vec<u8>,
-	// 		secret: &Vec<u8>,
-	// 		initial_price: u32,
-	// 		min_markup:u16,
-	// 		max_markup:u16,
-	// 		properties:u8,
-	// 		miner_ratio:u16,
-	// 		gift:u16,
-	// 		opt_lot:u8,
-	// 		money:TokenIdentifier
-	// ) -> SCResult<u64> {
-	//
-	// 	let caller=self.blockchain().get_caller();
-	// 	require!(opt_lot==0 || (opt_lot==1 && count>1 && gift>0),"Le reglage de opt_lot est incorrect");
-	// 	require!(count>0,"E01: At least one token must be mined");
-	// 	require!(new_token_title.len()+new_token_description.len() > 0,"E02: Title & description can't be empty together");
-	// 	require!(min_markup <= max_markup,"E03: L'interval de commission est incorrect");
-	//
-	// 	//La limite du miner_ratio est à 10000 car on multiplie par 100 pour autoriser un pourcentage à 2 décimal
-	// 	require!(miner_ratio<=10000,"E04: La part du mineur doit etre entre 0 et 100");
-	//
-	// 	//Creation de la monnaie
-	// 	require!(money.is_egld() || money.is_valid_esdt_identifier(),"Invalid money");
-	//
-	// 	if money.is_egld() {
-	// 		require!(payment>=BigUint::from(count*gift as u64),"E05: Transfert de fond insuffisant pour le token");
-	// 	}
-	//
-	// 	let token_id=self.perform_mint(count,caller,new_token_title,new_token_description,secret,initial_price,min_markup,max_markup,properties,miner_ratio,gift,opt_lot,&money);
-	// 	return Ok(token_id)
-	// }
+	#[endpoint]
+	#[payable("EGLD")]
+	fn mint(&self,
+			#[payment] payment: BigUint,
+			count: u64,
+			new_token_title: &Vec<u8>,
+			new_token_description: &Vec<u8>,
+			secret: &Vec<u8>,
+			initial_price: u32,
+			min_markup:u16,
+			max_markup:u16,
+			properties:u8,
+			miner_ratio:u16,
+			gift:u16,
+			opt_lot:u8,
+			money:TokenIdentifier
+	) -> SCResult<u64> {
+
+		let caller=self.blockchain().get_caller();
+		require!(opt_lot==0 || (opt_lot==1 && count>1 && gift>0),"Le reglage de opt_lot est incorrect");
+		require!(count>0,"E01: At least one token must be mined");
+		require!(new_token_title.len()+new_token_description.len() > 0,"E02: Title & description can't be empty together");
+		require!(min_markup <= max_markup,"E03: L'interval de commission est incorrect");
+
+		//La limite du miner_ratio est à 10000 car on multiplie par 100 pour autoriser un pourcentage à 2 décimal
+		require!(miner_ratio<=10000,"E04: La part du mineur doit etre entre 0 et 100");
+
+		//Creation de la monnaie
+		//voir https://github.com/ElrondNetwork/elrond-wasm-rs/blob/ed98b2b02bf95b7457c372f51b485ab69e019b58/elrond-wasm/src/types/general/token_identifier.rs
+
+		require!(money.is_egld() || money.is_valid_esdt_identifier(),"Invalid money");
+
+		if money.is_egld() {
+			require!(payment>=BigUint::from(count*gift as u64),"E05: Transfert de fond insuffisant pour le token");
+		}
+
+		let token_id=self.perform_mint(count,caller,new_token_title,new_token_description,secret,initial_price,min_markup,max_markup,properties,miner_ratio,gift,opt_lot,&money);
+		return Ok(token_id)
+	}
 
 
 
@@ -76,34 +78,34 @@ pub trait ENonFungibleTokens
 	/// Approves an account to transfer the token on behalf of its owner.<br>
 	/// Only the owner of the token may call this function.
 	// #[endpoint]
-	// fn approve(&self, token_id: u64, approved_address: ManagedAddress) -> SCResult<()> {
-	// 	let token=self.get_token(token_id);
-	// 	require!(token_id < self.get_total_minted(), "E06: Token does not exist!");
-	// 	require!(self.blockchain().get_caller() == token.owner ,"E07: Only the token owner can approve!");
-	//
-	// 	self.set_approval(token_id, &approved_address);
-	//
-	// 	Ok(())
-	// }
+	fn approve(&self, token_id: u64, approved_address: ManagedAddress) -> SCResult<()> {
+		let token=self.get_token(token_id);
+		require!(token_id < self.get_total_minted(), "E06: Token does not exist!");
+		require!(self.blockchain().get_caller() == token.owner ,"E07: Only the token owner can approve!");
+
+		self.set_approval(token_id, &approved_address);
+
+		Ok(())
+	}
 
 
 
 	/// Revokes approval for the token.<br>
 	/// Only the owner of the token may call this function.
 	// #[endpoint]
-	// fn revoke(&self, token_id: u64) -> SCResult<()> {
-	// 	require!(token_id < self.get_total_minted(), "E08: Token does not exist!");
-	//
-	// 	let token=self.get_token(token_id);
-	// 	require!(self.blockchain().get_caller() == token.owner,"E09: Only the token owner can revoke approval!");
-	//
-	// 	if !self.approval_is_empty(token_id) {
-	// 		//TODO: on considère les approuvés comme des distributeurs, on doit donc supprimer le distributeur
-	// 		self.perform_revoke_approval(token_id);
-	// 	}
-	//
-	// 	Ok(())
-	// }
+	fn revoke(&self, token_id: u64) -> SCResult<()> {
+		require!(token_id < self.get_total_minted(), "E08: Token does not exist!");
+
+		let token=self.get_token(token_id);
+		require!(self.blockchain().get_caller() == token.owner,"E09: Only the token owner can revoke approval!");
+
+		if !self.approval_is_empty(token_id) {
+			//TODO: on considère les approuvés comme des distributeurs, on doit donc supprimer le distributeur
+			self.perform_revoke_approval(token_id);
+		}
+
+		Ok(())
+	}
 
 
 
@@ -152,7 +154,7 @@ pub trait ENonFungibleTokens
 					new_token_description: &Vec<u8>,
 					secret: &Vec<u8>,
 					new_token_price: u32,
-					min_markup: u16,max_markup: u16,
+					min_markup: u16, max_markup: u16,
 					properties:u8,
 					miner_ratio:u16,
 					gift:u16,
@@ -163,14 +165,25 @@ pub trait ENonFungibleTokens
 		let first_new_id = total_minted;
 		let last_new_id = total_minted + count;
 
+		let mut temp_secret=secret.to_vec();
+
+		//Selection d'un billet gagnant pour le fonctionnement loterie
 		let mut set_gift=gift;
 		for id in first_new_id..last_new_id {
+
+			//Substitution de chaines
+			if &temp_secret==&Vec::from("@id") {
+				temp_secret=id.to_be_bytes().to_ascii_uppercase();
+			}
+
 			if opt_lot==1 {
 				if gift>0 {
 					if id % count == 0 {
 						set_gift = gift;
+						temp_secret= Vec::from("Gagné");
 					} else {
 						set_gift = 0;
+						temp_secret= Vec::from("Perdu");
 					}
 				}
 			}
@@ -182,7 +195,7 @@ pub trait ENonFungibleTokens
 				gift:set_gift,
 				title:new_token_title.to_vec(),
 				description:new_token_description.to_vec(),
-				secret:secret.to_vec(),
+				secret:temp_secret.to_vec(),
 				state:0u8,
 				min_markup:min_markup,
 				max_markup:max_markup,
@@ -273,21 +286,24 @@ pub trait ENonFungibleTokens
 		//let secret=v3::decrypt("secret",&enc_data);
 
 		if token.gift>0 {
+			//Si on est pas obligé de trouver le secret ou si la réponse est égale au secret
 			if token.properties & 0b00010000==0 || self.vec_equal(response,&secret) {
 				self.send_money(&token,&token.owner,BigUint::from(10000000000000000*token.gift as u64),b"pay for gift");
 				token.gift=0;
 				self.set_token(token_id,&token);
 			}
 
+			//
 			if token.properties & 0b00010000>0 {
 				if self.vec_equal(&response,&secret) {
-					secret=Vec::from("Gagnez");
+					secret=Vec::from("Gagné");
 				} else {
 					secret=Vec::from("Perdu");
 				}
 			}
 		}
 
+		//Le token doit être auto-détruit
 		if token.properties & 0b00001000>0 {
 			self.perform_burn(token_id,&mut token);
 		}

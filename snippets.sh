@@ -1,10 +1,9 @@
 #Ensemble de scripts de test du contrats
 
 #sed 's/\r$//' snippets.sh
-#cd /home/root/dev
-#pip install erdpy==1.0.18
+#cd /home/root/dev && pip install erdpy==1.0.18 && source snippets.sh && deploy
 #clear && erdpy contract build
-#source snippets.sh && deploy
+#
 #source snippets.sh && infos
 
 #récupération de l'environnement de développement
