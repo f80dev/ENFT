@@ -10,10 +10,17 @@ mod dealer;
 use dealer::Dealer;
 use token::Token;
 
+const RENT:u8				=0b10000000; //A l'ouverture le contrat est restitué au créateur
+const FIND_SECRET:u8		=0b00010000;
+const SELF_DESTRUCTION:u8	=0b00001000;
+const DIRECT_SELL:u8		=0b00000100;
+const CAN_RESELL:u8			=0b00000010;
+const CAN_TRANSFERT:u8		=0b00000001;
+
+
 #[elrond_wasm::contract]
 pub trait ENonFungibleTokens
 {
-
 	#[init]
 	fn init(&self,initial_value: u64) {
 		let owner = self.blockchain().get_caller();
@@ -118,7 +125,7 @@ pub trait ENonFungibleTokens
 		let mut token=self.get_token(token_id);
 
 		//Le mineur peut avoir limité la possibilité de transfert du token à sa création
-		require!(token.properties & 0b00000001 > 0,"E13: Ce token ne peut être offert");
+		require!(token.properties & CAN_TRANSFERT > 0,"E13: Ce token ne peut être offert");
 
 		let caller = self.blockchain().get_caller();
 
@@ -172,7 +179,7 @@ pub trait ENonFungibleTokens
 		for id in first_new_id..last_new_id {
 
 			//Substitution de chaines
-			if &temp_secret==&Vec::from("@id") {
+			if temp_secret.eq_ignore_ascii_case(&Vec::from("@id")) {
 				temp_secret=id.to_be_bytes().to_ascii_uppercase();
 			}
 
@@ -222,14 +229,15 @@ pub trait ENonFungibleTokens
 	}
 
 
+
 	fn perform_burn(self,token_id: u64,token: &mut Token<Self::Api>) -> bool {
 		if token.gift>0 {
 			//Remboursement du créateur
 			self.send_money(&token,&token.miner,BigUint::from(token.gift as u64*10000000000000000),b"Miner refund");
 		}
 
-		token.miner=self.types().address_zero();
-		token.owner=self.types().address_zero();
+		token.miner=self.types().managed_address_zero();
+		token.owner=self.types().managed_address_zero();
 		self.set_token(token_id,&token);
 
 		return true;
@@ -264,8 +272,28 @@ pub trait ENonFungibleTokens
 
 
 
+	//Mise a jour du token
+	#[endpoint]
+	fn update(&self, token_id: u64, field_name: &Vec<u8>,new_value: &Vec<u8>) -> SCResult<()>  {
 
-	//Retourne le contenu de la propriété secret du token en échange d'une vérification
+		require!(token_id < self.get_total_minted(), "Token does not exist!");
+		let mut token=self.get_token(token_id);
+
+		let caller = self.blockchain().get_caller();
+		require!(caller == token.owner,"E10: Seul le propriétaire peut mettre a jour le NFT");
+		require!(token.state == 1,"Le token ne doit pas être en vente");
+		require!(caller == token.miner,"Seul le créateur peut mettre a jour le token");
+
+		if field_name.eq_ignore_ascii_case(&Vec::from("title")) { token.title= new_value.to_vec(); }
+		if field_name.eq_ignore_ascii_case(&Vec::from("description")) { token.description= new_value.to_vec(); }
+
+		self.set_token(token_id,&token);
+
+		return Ok(());
+	}
+
+
+		//Retourne le contenu de la propriété secret du token en échange d'une vérification
 	//que l'appelant est bien propriétaire du token
 	//Si Response est non vide et Gift positif alors si response == secret on transfert le gift
 	#[endpoint]
@@ -280,32 +308,37 @@ pub trait ENonFungibleTokens
 		//let secret=mc.decrypt_base64_to_string(&token.secret).unwrap();
 		//TODO: mettre en place le décryptage du secret
 		//secret=self.decrypt(&secret);
+		let eq=token.secret.eq(response);
 
 		let mut secret=token.secret.clone();
 		//https://docs.rs/openssl/0.10.32/openssl/rsa/index.html
 		//let secret=v3::decrypt("secret",&enc_data);
 
 		if token.gift>0 {
-			//Si on est pas obligé de trouver le secret ou si la réponse est égale au secret
-			if token.properties & 0b00010000==0 || self.vec_equal(response,&secret) {
+			//Si on est pas obligé de trouver le secret ou si la réponse est égale au secret on distribue les gains
+			if token.properties & FIND_SECRET==0 || eq {
 				self.send_money(&token,&token.owner,BigUint::from(10000000000000000*token.gift as u64),b"pay for gift");
 				token.gift=0;
 				self.set_token(token_id,&token);
 			}
+		}
 
-			//
-			if token.properties & 0b00010000>0 {
-				if self.vec_equal(&response,&secret) {
-					secret=Vec::from("Gagné");
-				} else {
-					secret=Vec::from("Perdu");
-				}
+		//s'il fallait trouvé le secret
+		if token.properties & FIND_SECRET>0 {
+			if eq {
+				secret=Vec::from("Gagné");
+			} else {
+				secret=Vec::from("Perdu");
 			}
 		}
 
 		//Le token doit être auto-détruit
-		if token.properties & 0b00001000>0 {
+		if token.properties & SELF_DESTRUCTION>0 {
 			self.perform_burn(token_id,&mut token);
+		}
+
+		if token.properties & RENT>0 {
+			self.transfer(token_id,token.miner);
 		}
 
 		return Ok(secret);
@@ -323,13 +356,16 @@ pub trait ENonFungibleTokens
 
 		require!(token_id < self.get_total_minted(), "E19: Token does not exist!");
 		require!(token.owner == caller,"E17: Only token owner change state");
-		require!(token.properties & 0b00000010>0,"E18: Revente interdite");
+		require!(token.properties & CAN_RESELL>0,"E18: Revente interdite");
 
 		token.state=new_state;
 		self.set_token(token_id,&token);
 
-		Ok(())
+		return Ok(());
 	}
+
+
+
 
 	//Recherche un dealer par son adresse
 	//retourne dealer_count si on a pas trouvé le dealer
@@ -348,7 +384,7 @@ pub trait ENonFungibleTokens
 	//Recherche un dealer par son adresse dans un token
 	fn find_dealer_in_token(&self,dealer_addr: &ManagedAddress,token:&Token<Self::Api>) -> usize {
 		let mut rc=token.dealer_ids.len();
-		if dealer_addr != &self.types().address_zero() {
+		if dealer_addr != &self.types().managed_address_zero() {
 			let addrs=self.get_dealer_addresses_for_token(&token);
 			rc=addrs.iter().position(|x| x == dealer_addr).unwrap_or(token.dealer_ids.len());
 		}
@@ -369,7 +405,7 @@ pub trait ENonFungibleTokens
 
 		//self.ipfs_map().insert(miner_addr.clone(),ipfs_token);
 
-		Ok(())
+		return Ok(());
 	}
 
 
@@ -391,7 +427,7 @@ pub trait ENonFungibleTokens
 			idx=idx+1;
 		}
 
-		Ok(())
+		return Ok(());
 	}
 
 
@@ -464,7 +500,7 @@ pub trait ENonFungibleTokens
 
 		for idx in 0..self.get_dealer_count() {
 			let dealer=self.get_dealer(idx);
-			if filter_miner==self.types().address_zero() || dealer.miners.contains(&filter_miner) {
+			if filter_miner==self.types().managed_address_zero() || dealer.miners.contains(&filter_miner) {
 				rc.append(&mut dealer.addr.to_address().to_vec());
 				rc.push(dealer.state);
 			}
@@ -543,7 +579,7 @@ pub trait ENonFungibleTokens
 		token.dealer_markup[idx] = markup;
 		self.set_token(token_id,&token);
 
-		return Ok(())
+		return Ok(());
 	}
 
 
@@ -573,8 +609,8 @@ pub trait ENonFungibleTokens
 			payment_for_dealer=10000000000000000*token.dealer_markup[idx] as u64;
 		}
 
-		require!(token.properties & 0b00000100>0 || dealer!=self.types().address_zero() ,"E31: La vente directe n'est pas autorisé");
-		require!(dealer==self.types().address_zero() || idx<1000 ,"E32: Le revendeur n'est pas autorisé");
+		require!(token.properties & DIRECT_SELL>0 || dealer!=self.types().managed_address_zero() ,"E31: La vente directe n'est pas autorisé");
+		require!(dealer==self.types().managed_address_zero() || idx<1000 ,"E32: Le revendeur n'est pas autorisé");
 
 
 		//calcul du payment au owner
@@ -586,7 +622,7 @@ pub trait ENonFungibleTokens
 			require!(payment_for_owner >= BigUint::from(token.price.clone() as u64),"E33: Paiement du propriétaire inferieur au prix du token");
 		}
 
-		if dealer!=self.types().address_zero() && payment_for_dealer>0 {
+		if dealer!=self.types().managed_address_zero() && payment_for_dealer>0 {
 			//On retribue le mineur sur la commission du distributeur
 			if token.miner_ratio>0 {
 				let payment_for_miner=1000000000000*token.dealer_markup[idx] as u64*token.miner_ratio as u64;
@@ -647,9 +683,9 @@ pub trait ENonFungibleTokens
 
 			let idx = self.find_dealer_in_token(&seller_filter,&token);
 
-			if (owner_filter == self.types().address_zero() || owner_filter == token.owner)
-				&& (miner_filter == self.types().address_zero() || miner_filter == token.miner)
-				&& (seller_filter == self.types().address_zero() || idx < token.dealer_ids.len() ) {
+			if (owner_filter == self.types().managed_address_zero() || owner_filter == token.owner)
+				&& (miner_filter == self.types().managed_address_zero() || miner_filter == token.miner)
+				&& (seller_filter == self.types().managed_address_zero() || idx < token.dealer_ids.len() ) {
 
 				let mut item:Vec<u8>=Vec::new();
 
