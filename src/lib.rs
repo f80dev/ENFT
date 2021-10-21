@@ -199,6 +199,7 @@ pub trait ENonFungibleTokens
 				owner:new_token_owner.clone(),
 				miner:new_token_owner.clone(),
 				price:new_token_price.clone(),
+				resp:0u8,
 				gift:set_gift,
 				title:new_token_title.to_vec(),
 				description:new_token_description.to_vec(),
@@ -293,7 +294,27 @@ pub trait ENonFungibleTokens
 	}
 
 
-		//Retourne le contenu de la propriété secret du token en échange d'une vérification
+
+
+	//Principe du vote
+	#[endpoint]
+	fn answer(&self, token_id: u64, response: u8) -> SCResult<()> {
+		require!(token_id < self.get_total_minted(), "Token does not exist!");
+		let mut token=self.get_token(token_id);
+
+		let caller = self.blockchain().get_caller();
+		require!(caller == token.owner,"E10: Seul le propriétaire du token peut repondre");
+		require!(token.resp == 0,"Ce token contient déjà une reponse");
+
+		token.resp=response;
+		self.set_token(token_id,&token);
+
+		return Ok(());
+	}
+
+
+
+	//Retourne le contenu de la propriété secret du token en échange d'une vérification
 	//que l'appelant est bien propriétaire du token
 	//Si Response est non vide et Gift positif alors si response == secret on transfert le gift
 	#[endpoint]
@@ -493,7 +514,26 @@ pub trait ENonFungibleTokens
 	}
 
 
-	//retourne l'ensemble des distributeurs référencés si l'adresse est 0x0 ou les distributeurs d'un mineur
+
+	#[view(votes)]
+	fn get_votes(&self,filter_miner:ManagedAddress) -> Vec<u8> {
+
+		let mut results=Vec::new();
+
+		for i in 0u8..10u8 {
+			results.push(0u8);
+		}
+
+		for idx in 0..self.get_total_minted() {
+			let token=self.get_token(idx);
+			if token.miner==filter_miner {
+				results[token.resp as usize]=results[token.resp as usize]+1;
+			}
+		}
+		return results;
+	}
+
+		//retourne l'ensemble des distributeurs référencés si l'adresse est 0x0 ou les distributeurs d'un mineur
 	#[view(dealers)]
 	fn dealers(&self,filter_miner:ManagedAddress) -> Vec<u8> {
 		let mut rc=Vec::new();

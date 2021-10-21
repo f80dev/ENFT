@@ -13,6 +13,7 @@ pub struct Token<M: ManagedTypeApi> {
      pub secret:Vec<u8>,
      pub gift:u16,
      pub state:u8,
+     pub resp:u8,
 
      pub dealer_ids:Vec<u16>,          //Distributeurs autorisés
      pub dealer_markup:Vec<u16>,        //Marge de chaque distributeur
