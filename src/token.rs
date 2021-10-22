@@ -12,7 +12,6 @@ pub struct Token<M: ManagedTypeApi> {
      pub description: Vec<u8>,
      pub secret:Vec<u8>,
      pub gift:u16,
-     pub state:u8,
      pub resp:u8,
 
      pub dealer_ids:Vec<u16>,          //Distributeurs autorisés
@@ -34,7 +33,7 @@ pub struct Token<M: ManagedTypeApi> {
      // - 0b00000100 vente directe possible
      // - 0b00000010 le propriétaire peut remettre en vente
      // - 0b00000001 le propriétaire peut offrir
-     pub properties:u8,
+     pub properties:u16,
      pub miner_ratio:u16,
 
      pub money:TokenIdentifier<M>

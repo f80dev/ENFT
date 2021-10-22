@@ -10,12 +10,16 @@ mod dealer;
 use dealer::Dealer;
 use token::Token;
 
-const RENT:u8				=0b10000000; //A l'ouverture le contrat est restitué au créateur
-const FIND_SECRET:u8		=0b00010000;
-const SELF_DESTRUCTION:u8	=0b00001000;
-const DIRECT_SELL:u8		=0b00000100;
-const CAN_RESELL:u8			=0b00000010;
-const CAN_TRANSFERT:u8		=0b00000001;
+const SECRET_VOTE:u16		=0b0000010000000000;
+const FOR_SALE:u16			=0b0000001000000000;
+const VOTE:u16				=0b0000000100000000;
+const RENT:u16				=0b0000000010000000; //A l'ouverture le contrat est restitué au créateur
+const FIND_SECRET:u16		=0b0000000000010000;
+const SELF_DESTRUCTION:u16	=0b0000000000001000;
+const DIRECT_SELL:u16		=0b0000000000000100;
+const CAN_RESELL:u16		=0b0000000000000010;
+const CAN_TRANSFERT:u16		=0b0000000000000001;
+
 
 
 #[elrond_wasm::contract]
@@ -50,7 +54,7 @@ pub trait ENonFungibleTokens
 			initial_price: u32,
 			min_markup:u16,
 			max_markup:u16,
-			properties:u8,
+			properties:u16,
 			miner_ratio:u16,
 			gift:u16,
 			opt_lot:u8,
@@ -162,7 +166,7 @@ pub trait ENonFungibleTokens
 					secret: &Vec<u8>,
 					new_token_price: u32,
 					min_markup: u16, max_markup: u16,
-					properties:u8,
+					properties:u16,
 					miner_ratio:u16,
 					gift:u16,
 					opt_lot:u8,
@@ -204,7 +208,6 @@ pub trait ENonFungibleTokens
 				title:new_token_title.to_vec(),
 				description:new_token_description.to_vec(),
 				secret:temp_secret.to_vec(),
-				state:0u8,
 				min_markup:min_markup,
 				max_markup:max_markup,
 				dealer_ids:Vec::new(),
@@ -282,7 +285,7 @@ pub trait ENonFungibleTokens
 
 		let caller = self.blockchain().get_caller();
 		require!(caller == token.owner,"E10: Seul le propriétaire peut mettre a jour le NFT");
-		require!(token.state == 1,"Le token ne doit pas être en vente");
+		require!(token.properties & FOR_SALE==0,"Le token ne doit pas être en vente");
 		require!(caller == token.miner,"Seul le créateur peut mettre a jour le token");
 
 		if field_name.eq_ignore_ascii_case(&Vec::from("title")) { token.title= new_value.to_vec(); }
@@ -304,7 +307,13 @@ pub trait ENonFungibleTokens
 
 		let caller = self.blockchain().get_caller();
 		require!(caller == token.owner,"E10: Seul le propriétaire du token peut repondre");
-		require!(token.resp == 0,"Ce token contient déjà une reponse");
+
+		if token.gift>0 {
+			//On récompense le participant
+			self.send_money(&token,&token.owner,BigUint::from(10000000000000000*token.gift as u64),b"pay for gift");
+			token.gift=0;
+		}
+
 
 		token.resp=response;
 		self.set_token(token_id,&token);
@@ -379,7 +388,12 @@ pub trait ENonFungibleTokens
 		require!(token.owner == caller,"E17: Only token owner change state");
 		require!(token.properties & CAN_RESELL>0,"E18: Revente interdite");
 
-		token.state=new_state;
+		if new_state==0 {
+			token.properties=token.properties + FOR_SALE;
+		} else {
+			token.properties=token.properties & !FOR_SALE;
+		}
+
 		self.set_token(token_id,&token);
 
 		return Ok(());
@@ -533,6 +547,7 @@ pub trait ENonFungibleTokens
 		return results;
 	}
 
+
 		//retourne l'ensemble des distributeurs référencés si l'adresse est 0x0 ou les distributeurs d'un mineur
 	#[view(dealers)]
 	fn dealers(&self,filter_miner:ManagedAddress) -> Vec<u8> {
@@ -639,7 +654,7 @@ pub trait ENonFungibleTokens
 
 		let caller=self.blockchain().get_caller();
 		require!(token.owner != caller,"E29: Ce token vous appartient déjà");
-		require!(token.state == 0,"E30: Ce token n'est pas en vente");
+		require!(token.properties & FOR_SALE>0,"E30: Ce token n'est pas en vente");
 
 		let addrs=self.get_dealer_addresses_for_token(&token);
 		let idx = addrs.iter().position(|x| x == &dealer).unwrap_or(1000);
@@ -678,7 +693,7 @@ pub trait ENonFungibleTokens
 			self.send_money(&token,&token.owner,payment_for_owner,b"owner pay");
 		}
 
-		token.state=1;//Le token n'est plus a vendre
+		token.properties=token.properties & !FOR_SALE;//Le token n'est plus a vendre
 		token.owner=caller; //On change le propriétaire
 		self.set_token(token_id,&token);
 
@@ -754,8 +769,16 @@ pub trait ENonFungibleTokens
 
 				item.append(&mut token.owner.to_address().to_vec());
 				item.push(has_secret);
-				item.push(token.state);
-				item.push(token.properties);
+
+				item.push(token.properties.to_be_bytes()[0]);
+				item.push(token.properties.to_be_bytes()[1]);
+
+				if token.properties & SECRET_VOTE>0 {
+					item.push(0u8);
+				} else {
+					item.push(token.resp);
+				}
+
 				item.append(&mut token.min_markup.to_be_bytes().to_vec());
 				item.append(&mut token.max_markup.to_be_bytes().to_vec());
 				item.append(&mut markup.to_be_bytes().to_vec());
