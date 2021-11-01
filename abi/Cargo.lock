@@ -70,9 +70,9 @@ dependencies = [
 
 [[package]]
 name = "elrond-codec"
-version = "0.7.0"
+version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a828c5006c2ffbc55b98dbbc82118d10fea6ce7cb5169e3d860f2ef0b19829fe"
+checksum = "31092b48e811ffe12b1c8a46955a351e200215b4808bd3c194ee99e796a6468f"
 dependencies = [
  "arrayvec",
  "elrond-codec-derive",
@@ -81,9 +81,9 @@ dependencies = [
 
 [[package]]
 name = "elrond-codec-derive"
-version = "0.7.0"
+version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5859863d5d5b842a98354f4398606bd18da462df48a7ad144b8b3cfbcfaa600e"
+checksum = "068bbfc294dc35854b3a9648dbe85f9955a0a44f87d633df3803c9760575cd55"
 dependencies = [
  "hex",
  "proc-macro2",
@@ -93,9 +93,9 @@ dependencies = [
 
 [[package]]
 name = "elrond-wasm"
-version = "0.20.1"
+version = "0.21.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "75d82b6d8d7d7db24f89196dd5ac388d28c5cf824e44df2b61846271f330c3f7"
+checksum = "a083f14244726defc8e49134ec4211ef61a69f29e7df41e2d2284734befeea87"
 dependencies = [
  "arrayvec",
  "elrond-codec",
@@ -107,9 +107,9 @@ dependencies = [
 
 [[package]]
 name = "elrond-wasm-debug"
-version = "0.20.1"
+version = "0.21.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a2b8d70b694fbaa401b718a22dd1c886407312cf3116581a3d313f76cbab4e55"
+checksum = "4a6f25108436df296b1b8c08336beffc85afa6016b78f941a7e236c81e22672a"
 dependencies = [
  "elrond-wasm",
  "hex",
@@ -125,9 +125,9 @@ dependencies = [
 
 [[package]]
 name = "elrond-wasm-derive"
-version = "0.20.1"
+version = "0.21.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "695dcbc6d4226e289261cadd13e5c3e8714b4c270b0e2a1e7da3763c14b7816b"
+checksum = "dd02d9e5a77816c6d7707173324b9c63e96def95508fbd236bea1f7395f53177"
 dependencies = [
  "hex",
  "proc-macro2",
@@ -220,9 +220,9 @@ checksum = "b7282d924be3275cec7f6756ff4121987bc6481325397dde6ba3e7802b1a8b1c"
 
 [[package]]
 name = "mandos"
-version = "0.10.0"
+version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d88e5ec03ece5d629f06727750719e0ebe6fe5f067a80807a0c7e3fb7837da93"
+checksum = "27bf7cd11f1278190deb39ac404d3eb217e972ab89ebb3558a902f7c7de8bdca"
 dependencies = [
  "hex",
  "num-bigint",

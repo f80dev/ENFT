@@ -2,7 +2,7 @@
 
 #Compilation et déploiement du smartcontrat (la cible testnet, devnet étant déterminée ci-dessous)
 #sed 's/\r$//' snippets.sh
-#cd /home/root/dev && pip install erdpy==1.0.19 && source snippets.sh && deploy
+#cd /home/root/dev && pip install erdpy==1.0.21 && source snippets.sh && deploy
 #clear && erdpy contract build
 #
 #source snippets.sh && infos
