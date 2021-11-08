@@ -3,6 +3,7 @@
 #Compilation et déploiement du smartcontrat (la cible testnet, devnet étant déterminée ci-dessous)
 #sed 's/\r$//' snippets.sh
 #cd /home/root/dev && pip install erdpy==1.0.21 && source snippets.sh && deploy
+#cd /home/root/dev && pip install erdpy==1.0.21 && erdpy contract build
 #clear && erdpy contract build
 #
 #source snippets.sh && infos
@@ -59,6 +60,7 @@ deploy() {
     echo "Transaction https://devnet-explorer.elrond.com/transactions/${TRANSACTION}"
     echo "Transaction ${PROXY}/transaction/${TRANSACTION}"
     echo "Smart contract address: https://devnet-explorer.elrond.com/address/${ADDRESS}"
+    echo "Smart contract address: https://testnet-explorer.elrond.com/address/${ADDRESS}"
     echo "Smart contract address: ${PROXY}/address/${ADDRESS}"
     echo "contract deployed ${ADDRESS}"
 }

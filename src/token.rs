@@ -1,6 +1,6 @@
 use elrond_wasm::{
      api::ManagedTypeApi,
-     types::{ManagedAddress, TokenIdentifier,Vec},
+     types::{TokenIdentifier,Vec},
 };
 
 elrond_wasm::derive_imports!();
@@ -12,7 +12,7 @@ pub struct Token<M: ManagedTypeApi> {
      pub description: Vec<u8>,
      pub secret:Vec<u8>,
      pub gift:u16,
-     pub resp:u8,
+     pub resp:u8,                       //Reponse indiquer par le propriétaire (utilisé pour les sondages)
 
      pub dealer_ids:Vec<u16>,          //Distributeurs autorisés
      pub dealer_markup:Vec<u16>,        //Marge de chaque distributeur
@@ -20,8 +20,8 @@ pub struct Token<M: ManagedTypeApi> {
      pub min_markup:u16,                //Marge minimum autorisée
      pub max_markup:u16,                //Marge maximum autorisée
 
-     pub owner:ManagedAddress<M>,
-     pub miner:ManagedAddress<M>,
+     pub owner:usize,                   //Référence au tableau d'adresses en passant par les fonctions get_addresses(token,OWNER)
+     pub miner:usize,                   //Référence au tableau d'adresses en passant par les fonctions get_addresses(token,MINER)
 
      //properties est stoké sur 8 bits.
      //Signification de chaque bit en partant du plus haut (gauche)
