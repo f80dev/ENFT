@@ -10,7 +10,8 @@ mod token;
 mod dealer;
 use elrond_wasm::elrond_codec::TopDecodeInput;
 
-
+const MINER_CAN_BURN:u16	=0b0001000000000000; //Le token ne peut être possédé qu'une seul fois
+const UNIK:u16				=0b0000100000000000; //Le token ne peut être possédé qu'une seul fois
 const SECRET_VOTE:u16		=0b0000010000000000;
 const FOR_SALE:u16			=0b0000001000000000;
 //const VOTE:u16				=0b0000000100000000;
@@ -30,29 +31,55 @@ const NOT_FIND:usize = 0;
 pub trait ENonFungibleTokens
 {
 
+
+	//Récupération d'un token
+	#[view(getToken)]
+	#[storage_get("token")]
+	fn get_token(&self,  token_id: u64) -> Token;
+	#[storage_set("token")]
+	fn set_token(&self, token_id: u64, token: &Token);
+
+
 	//Ajout d'une adresse dans le referentiel d'adresses si elle n'était pas encore présente
 	//retourne la position de l'adresse
-	fn set_addresses(&self,new_addr: &ManagedAddress) -> usize {
+	fn set_addresses(&self,new_addr: &ManagedAddress) -> u32 {
 		let mut rc=self.addresses();
 		let mut idx =rc.load_as_vec().iter().position(|r| r == new_addr).unwrap_or(NOT_FIND);
 		if idx == NOT_FIND {
 			idx = rc.len();
 			rc.push(&new_addr);
 		}
-		return idx+1; //Car la lecture du vecteur commence à 1
+		return (idx+1) as u32; //Car la lecture du vecteur commence à 1
 	}
 
 
 	//Retourne une adresse de token du référentiel d'adresses
-	fn get_addresses(&self,token: &Token<Self::Api>,type_addr: u8) -> ManagedAddress {
-		let mut rc=self.addresses().get(token.owner);
+	fn get_addresses(&self,token: &Token,type_addr: u8) -> ManagedAddress {
+		let mut rc=self.addresses().get(token.owner as usize);
 		if type_addr == MINER {
-			rc=self.addresses().get(token.miner);
+			rc=self.addresses().get(token.miner as usize);
 		}
 		return rc;
 	}
 
 
+
+	fn set_esdt(&self,new_token: &TokenIdentifier) -> u16 {
+		let mut rc=self.esdt_map();
+		let mut idx =rc.load_as_vec().iter().position(|r| r == new_token).unwrap_or(NOT_FIND);
+		if idx == NOT_FIND {
+			idx = rc.len();
+			rc.push(&new_token);
+		}
+		return (idx+1) as u16; //Car la lecture du vecteur commence à 1
+	}
+
+
+
+	//Retourne une adresse de token du référentiel d'adresses
+	fn get_esdt(&self,token: &Token) -> TokenIdentifier {
+		return self.esdt_map().get(token.money as usize);
+	}
 
 
 
@@ -249,7 +276,6 @@ pub trait ENonFungibleTokens
 				token_secret=Vec::new();
 			}
 
-
 			let token = Token {
 				owner:owner_addr,
 				miner:owner_addr,
@@ -265,7 +291,7 @@ pub trait ENonFungibleTokens
 				dealer_markup:Vec::new(),
 				properties:properties,
 				miner_ratio:miner_ratio,
-				money: money.clone()
+				money: self.set_esdt(money)
 			};
 
 			self.set_token(id, &token);
@@ -285,7 +311,7 @@ pub trait ENonFungibleTokens
 
 
 
-	fn perform_burn(self,token_id: u64,token: &mut Token<Self::Api>) -> bool {
+	fn perform_burn(self,token_id: u64,token: &mut Token) -> bool {
 		if token.gift>0 {
 			let miner_addr=self.get_addresses(&token,MINER);
 			//Remboursement du créateur
@@ -308,7 +334,7 @@ pub trait ENonFungibleTokens
 		let caller = self.blockchain().get_caller();
 		let mut token = self.get_token(token_id);
 
-		require!(caller == self.get_addresses(&token,OWNER),"E16: Only the owner account can burn token!");
+		require!(caller == self.get_addresses(&token,OWNER) || (caller==self.get_addresses(&token,MINER) && token.properties & MINER_CAN_BURN>0),"E16: Only the owner account can burn token!");
 
 		self.perform_burn(token_id, &mut token);
 
@@ -319,11 +345,12 @@ pub trait ENonFungibleTokens
 
 
 
-	fn send_money(&self,token:&Token<Self::Api>,dest:&ManagedAddress, amount:BigUint, comment:&[u8]) {
-		if token.money.is_egld() {
+	fn send_money(&self,token:&Token,dest:&ManagedAddress, amount:BigUint, comment:&[u8]) {
+		let money=self.get_esdt(&token);
+		if money.is_egld() {
 			self.send().direct_egld(dest,&amount,comment);
 		} else {
-			self.send().direct(dest, &token.money, 0,&(amount), comment);
+			self.send().direct(dest, &money, 0,&(amount), comment);
 		}
 	}
 
@@ -479,7 +506,7 @@ pub trait ENonFungibleTokens
 
 
 	//Recherche un dealer par son adresse dans un token
-	fn find_dealer_in_token(&self,dealer_addr: &ManagedAddress,token:&Token<Self::Api>) -> usize {
+	fn find_dealer_in_token(&self,dealer_addr: &ManagedAddress,token:&Token) -> usize {
 		let mut rc=token.dealer_ids.len();
 		if dealer_addr != &self.types().managed_address_zero() {
 			let addrs=self.get_dealer_addresses_for_token(&token);
@@ -731,11 +758,17 @@ pub trait ENonFungibleTokens
 		require!(token.properties & DIRECT_SELL>0 || dealer!=self.types().managed_address_zero() ,"E31: La vente directe n'est pas autorisé");
 		require!(dealer==self.types().managed_address_zero() || idx<1000 ,"E32: Le revendeur n'est pas autorisé");
 
+		if(token.properties & UNIK>0){
+			//TODO ajouter ici le code
+			//let tokens=self.get_tokens(self.types().managed_address_zero(),caller,self.types().managed_address_zero());
+			//require!(!self.is_in(&token,tokens),"Ce token ne peut être acheté qu'une seule fois");
+		}
 
 		//calcul du payment au owner
 		let mut payment_for_owner=payment-BigUint::from(payment_for_dealer);
 		//Dans le cas d'un ESDT on corrige la valeur de payment en attendant de savoir comment la passer en argument depuis python
-		if token.money.is_esdt() {
+		let money=self.get_esdt(&token);
+		if money.is_esdt() {
 			payment_for_owner=BigUint::from(10000000000000000*token.price as u64)-BigUint::from(payment_for_dealer);
 		} else {
 			require!(payment_for_owner >= BigUint::from(token.price.clone() as u64),"E33: Paiement du propriétaire inferieur au prix du token");
@@ -767,7 +800,7 @@ pub trait ENonFungibleTokens
 
 
 
-	fn get_dealer_addresses_for_token(&self,token: &Token<Self::Api>) -> Vec<ManagedAddress> {
+	fn get_dealer_addresses_for_token(&self,token: &Token) -> Vec<ManagedAddress> {
 		let mut rc=Vec::new();
 		for i in 0..token.dealer_ids.len(){
 			let dealer=self.get_dealer(token.dealer_ids[i]);
@@ -787,6 +820,37 @@ pub trait ENonFungibleTokens
 	}
 
 
+	//Complete la réference par la chaine complete
+	fn complete_token(&self,token: Token) -> Token {
+		let mut rc=token;
+		if rc.title[0]==0 {
+			let ref_token=self.get_token(rc.title.into_u64()); //Le title contient l'index du token master
+			rc.title=ref_token.title.clone();
+			rc.description=ref_token.description.clone();
+			rc.secret=ref_token.secret.clone();
+		}
+		return rc;
+	}
+
+
+	fn is_in(&self,token: &Token , list_tokens:&Vec<Token>) -> bool {
+		if token.properties & UNIK==0 {
+			return false;
+		}
+		// for t in list_tokens {
+		// 	if t.miner==token.miner {
+		// 		let mut comp=t;
+		// 		if token.title[0]>0 {
+		// 			comp=self.complete_token(t);
+		// 		}
+		// 		if comp.title==token.title {
+		// 			return true;
+		// 		}
+		// 	}
+		// }
+		return false;
+	}
+
 
 
 	//Récupérer l'ensemble des tokens en appliquant les filtres sauf si celui est à la valeur 0x0
@@ -800,7 +864,7 @@ pub trait ENonFungibleTokens
 		let total_minted = self.get_total_minted();
 
 		for i in 0..total_minted {
-			let mut token=self.get_token(i);
+			let mut token=self.complete_token(self.get_token(i));
 			let token_owner_addr=self.get_addresses(&token,OWNER);
 			let token_miner_addr=self.get_addresses(&token,MINER);
 
@@ -812,20 +876,11 @@ pub trait ENonFungibleTokens
 
 				let mut item:Vec<u8>=Vec::new();
 
-				let title=token.title.clone();
-				if title[0]==0 {
-					let ref_token=self.get_token(title.into_u64()); //Le title contient l'index du token master
-					token.title=ref_token.title.clone();
-					token.description=ref_token.description.clone();
-					token.secret=ref_token.secret.clone();
-				}
-
-
 				//On commence par inscrire la taille de token_price & title dont les tailles dépendent du contenu
 				//doc sur le conversion :https://docs.rs/elrond-wasm/0.10.3/elrond_wasm/
 				item.append(&mut token.title.len().to_be_bytes().to_vec());
 				item.append(&mut token.description.len().to_be_bytes().to_vec());
-				item.append(&mut token.money.as_name().len().to_be_bytes().to_vec());
+				item.append(&mut self.get_esdt(&token).as_name().len().to_be_bytes().to_vec());
 
 				//Puis on ajoute l'ensemble des informations d'un token
 				//dans un vecteur d'octets
@@ -842,7 +897,7 @@ pub trait ENonFungibleTokens
 				}
 
 				item.append(&mut price.to_be_bytes().to_vec());
-				item.append(&mut token.money.as_name().into_vec());
+				item.append(&mut self.get_esdt(&token).as_name().into_vec());
 
 				item.append(&mut token_owner_addr.to_address().to_vec());
 				item.push(has_secret);
@@ -910,6 +965,10 @@ pub trait ENonFungibleTokens
 	#[storage_mapper("addresses")]
 	fn addresses(&self) -> VecMapper<ManagedAddress>;
 
+	#[view(ESDT_map)]
+	#[storage_mapper("ESDT_map")]
+	fn esdt_map(&self) -> VecMapper<TokenIdentifier>;
+
 	#[view(dealerCount)]
 	#[storage_get("dealerCount")]
 	fn get_dealer_count(&self) -> u16;
@@ -924,12 +983,7 @@ pub trait ENonFungibleTokens
 	fn set_token_count(&self, owner: &ManagedAddress, token_count: u64);
 
 
-	//Récupération d'un token
-	#[view(getToken)]
-	#[storage_get("token")]
-	fn get_token(&self,  token_id: u64) -> Token<Self::Api>;
-	#[storage_set("token")]
-	fn set_token(&self, token_id: u64, token: &Token<Self::Api>);
+
 
 
 

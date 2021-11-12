@@ -1,12 +1,11 @@
 use elrond_wasm::{
-     api::ManagedTypeApi,
-     types::{TokenIdentifier,Vec},
+     types::{Vec},
 };
 
 elrond_wasm::derive_imports!();
 
 #[derive(NestedEncode, NestedDecode,TopEncode,TopDecode,TypeAbi)]
-pub struct Token<M: ManagedTypeApi> {
+pub struct Token {
      pub price: u32,
      pub title: Vec<u8>,
      pub description: Vec<u8>,
@@ -20,23 +19,13 @@ pub struct Token<M: ManagedTypeApi> {
      pub min_markup:u16,                //Marge minimum autorisée
      pub max_markup:u16,                //Marge maximum autorisée
 
-     pub owner:usize,                   //Référence au tableau d'adresses en passant par les fonctions get_addresses(token,OWNER)
-     pub miner:usize,                   //Référence au tableau d'adresses en passant par les fonctions get_addresses(token,MINER)
+     pub owner:u32,                   //Référence au tableau d'adresses en passant par les fonctions get_addresses(token,OWNER)
+     pub miner:u32,                   //Référence au tableau d'adresses en passant par les fonctions get_addresses(token,MINER)
 
-     //properties est stoké sur 8 bits.
-     //Signification de chaque bit en partant du plus haut (gauche)
-     // - 0b10000000 non utilisé
-     // - 0b01000000 on affiche un cadre autour de l'image (1) ou pas (0)
-     // - 0b00100000 On affiche (1) ou pas (0) l'option d'ouverture même si aucun secret (TODO a priori à libérer)
-     // - 0b00010000 L'utilisateur doit fournir le secret dans l'open pour recevoir le cadeau
-     // - 0b00001000 auto destruction du token après ouverture
-     // - 0b00000100 vente directe possible
-     // - 0b00000010 le propriétaire peut remettre en vente
-     // - 0b00000001 le propriétaire peut offrir
-     pub properties:u16,
+     pub properties:u16,                //Voir la liste des constantes pour l'usage de properties
      pub miner_ratio:u16,
 
-     pub money:TokenIdentifier<M>
+     pub money:u16                 //Reférence à une money
 }
 
 
