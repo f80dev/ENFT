@@ -24,7 +24,7 @@ const CAN_TRANSFERT:u16		=0b0000000000000001;
 
 const MINER:u8 = 0;
 const OWNER:u8 = 1;
-const NOT_FIND:usize = 0;
+const NOT_FIND:usize = 65535;
 
 
 #[elrond_wasm::contract]
@@ -123,7 +123,8 @@ pub trait ENonFungibleTokens
 			miner_ratio:u16,
 			gift:u16,
 			opt_lot:u8,
-			money:TokenIdentifier
+			money:TokenIdentifier,
+			ref_token_id:u64
 	) -> SCResult<u64> {
 
 		let caller=self.blockchain().get_caller();
@@ -144,7 +145,7 @@ pub trait ENonFungibleTokens
 			require!(payment>=BigUint::from(count*gift as u64),"E05: Transfert de fond insuffisant pour le token");
 		}
 
-		let token_id=self.perform_mint(count,caller,new_token_title,new_token_description,secret,initial_price,min_markup,max_markup,properties,miner_ratio,gift,opt_lot,&money);
+		let token_id=self.perform_mint(count,caller,new_token_title,new_token_description,secret,initial_price,min_markup,max_markup,properties,miner_ratio,gift,opt_lot,&money,ref_token_id);
 		return Ok(token_id)
 	}
 
@@ -235,7 +236,9 @@ pub trait ENonFungibleTokens
 					miner_ratio:u16,
 					gift:u16,
 					opt_lot:u8,
-					money: &TokenIdentifier) -> u64 {
+					money: &TokenIdentifier,
+					ref_token_id:u64) -> u64 {
+
 		let new_owner_current_total = self.get_token_count(&new_token_owner);
 		let total_minted = self.get_total_minted();
 		let first_new_id = total_minted;
@@ -246,12 +249,14 @@ pub trait ENonFungibleTokens
 		//Selection d'un billet gagnant pour le fonctionnement loterie
 		let mut set_gift=gift;
 		let owner_addr=self.set_addresses(&new_token_owner);
+		let id_money=self.set_esdt(money);
+
 		for id in first_new_id..last_new_id {
 
 			//Substitution de chaines
-			if temp_secret.eq_ignore_ascii_case(&Vec::from("@id@")) {
-				temp_secret=id.to_be_bytes().to_ascii_uppercase();
-			}
+			// if temp_secret.eq_ignore_ascii_case(&Vec::from("@id@")) {
+			// 	temp_secret=id.to_be_bytes().to_ascii_uppercase();
+			// }
 
 			if opt_lot==1 {
 				if gift>0 {
@@ -270,8 +275,14 @@ pub trait ENonFungibleTokens
 			let mut token_description=new_token_description.to_vec();
 			let mut token_secret=temp_secret.to_vec();
 
-			if id > first_new_id && opt_lot==0 {
-				token_title=first_new_id.to_be_bytes().to_vec();
+			if (id > first_new_id && opt_lot==0) || (ref_token_id>0) {
+				if ref_token_id==0 {
+					//On utilise le premier token qui a été fabriqué
+					token_title=first_new_id.to_be_bytes().to_vec();
+				} else {
+					//on utilise celui qui est passé en référence
+					token_title=ref_token_id.to_be_bytes().to_vec();
+				}
 				token_description=Vec::new();
 				token_secret=Vec::new();
 			}
@@ -291,7 +302,7 @@ pub trait ENonFungibleTokens
 				dealer_markup:Vec::new(),
 				properties:properties,
 				miner_ratio:miner_ratio,
-				money: self.set_esdt(money)
+				money: id_money
 			};
 
 			self.set_token(id, &token);
@@ -299,7 +310,7 @@ pub trait ENonFungibleTokens
 
 		self.set_total_minted(total_minted + count);
 		self.set_token_count(&new_token_owner, new_owner_current_total + count);
-		return last_new_id;
+		return first_new_id;
 	}
 
 
@@ -821,8 +832,8 @@ pub trait ENonFungibleTokens
 
 
 	//Complete la réference par la chaine complete
-	fn complete_token(&self,token: Token) -> Token {
-		let mut rc=token;
+	fn complete_token(&self,id: u64) -> Token {
+		let mut rc=self.get_token(id);
 		if rc.title[0]==0 {
 			let ref_token=self.get_token(rc.title.into_u64()); //Le title contient l'index du token master
 			rc.title=ref_token.title.clone();
@@ -833,7 +844,7 @@ pub trait ENonFungibleTokens
 	}
 
 
-	fn is_in(&self,token: &Token , list_tokens:&Vec<Token>) -> bool {
+	fn _is_in(&self,token: &Token , _list_tokens:&Vec<Token>) -> bool {
 		if token.properties & UNIK==0 {
 			return false;
 		}
@@ -864,7 +875,7 @@ pub trait ENonFungibleTokens
 		let total_minted = self.get_total_minted();
 
 		for i in 0..total_minted {
-			let mut token=self.complete_token(self.get_token(i));
+			let mut token=self.complete_token(i);
 			let token_owner_addr=self.get_addresses(&token,OWNER);
 			let token_miner_addr=self.get_addresses(&token,MINER);
 

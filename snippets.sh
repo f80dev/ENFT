@@ -5,6 +5,7 @@
 #cd /home/root/dev && pip install erdpy==1.0.21 && source snippets.sh && deploy
 #cd /home/root/dev && pip install erdpy==1.0.21 && erdpy contract build
 #clear && erdpy contract build
+#clear && source snippets.sh && deploy
 #
 #source snippets.sh && infos
 

@@ -70,9 +70,9 @@ dependencies = [
 
 [[package]]
 name = "elrond-codec"
-version = "0.8.1"
+version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "31092b48e811ffe12b1c8a46955a351e200215b4808bd3c194ee99e796a6468f"
+checksum = "210a8c2db7712fd51bb6fb06c86378304afd34c927d61c356ac3dd4e25ae04fd"
 dependencies = [
  "arrayvec",
  "elrond-codec-derive",
@@ -81,9 +81,9 @@ dependencies = [
 
 [[package]]
 name = "elrond-codec-derive"
-version = "0.8.1"
+version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "068bbfc294dc35854b3a9648dbe85f9955a0a44f87d633df3803c9760575cd55"
+checksum = "201be188002de9f253e6d8620e28c91de258b380cc7f50adb6f571b8190f88ba"
 dependencies = [
  "hex",
  "proc-macro2",
