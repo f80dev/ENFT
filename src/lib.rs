@@ -254,9 +254,9 @@ pub trait ENonFungibleTokens
 		for id in first_new_id..last_new_id {
 
 			//Substitution de chaines
-			// if temp_secret.eq_ignore_ascii_case(&Vec::from("@id@")) {
-			// 	temp_secret=id.to_be_bytes().to_ascii_uppercase();
-			// }
+			if temp_secret.eq_ignore_ascii_case(&Vec::from("@id")) {
+				temp_secret=id.to_be_bytes().to_ascii_uppercase();
+			}
 
 			if opt_lot==1 {
 				if gift>0 {
@@ -340,9 +340,11 @@ pub trait ENonFungibleTokens
 	//Détruit un token en lui affectant l'adresse 0x0 comme propriétaire et mineur
 	#[endpoint]
 	fn burn(&self, token_id: u64) -> SCResult<()> {
-		require!(token_id < self.get_total_minted(), "E15: Token does not exist!");
-
 		let caller = self.blockchain().get_caller();
+		let total_minted=self.get_total_minted();
+
+		require!(token_id < total_minted, "E15: Token does not exist!");
+
 		let mut token = self.get_token(token_id);
 
 		require!(caller == self.get_addresses(&token,OWNER) || (caller==self.get_addresses(&token,MINER) && token.properties & MINER_CAN_BURN>0),"E16: Only the owner account can burn token!");
