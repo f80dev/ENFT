@@ -25,7 +25,9 @@ pub struct Token {
      pub properties:u16,                //Voir la liste des constantes pour l'usage de properties
      pub miner_ratio:u16,
 
-     pub money:u16                 //Reférence à une money
+     pub money:u16,                      //Reférence à une money
+     pub status:u8                      //status sur l'état du token
+     //pub deadline:u64                   //Date limite d'ouverture du token et voir la commande self.bloackc
 }
 
 
