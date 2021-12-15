@@ -10,8 +10,9 @@ mod token;
 mod dealer;
 use elrond_wasm::elrond_codec::TopDecodeInput;
 
-
+const IS_MASTER:u8    	    =0b00000010; //est utilisé par un clone (dans ce cas là le token ne peut être brulé)
 const IS_CLONE:u8    	    =0b00000001; //Le token ne peut être possédé qu'une seul fois
+
 
 const FOR_SALE:u16			=0b0100000000000000;
 const ONE_WINNER:u16    	=0b0010000000000000; //Le token ne peut être possédé qu'une seul fois
@@ -108,19 +109,26 @@ pub trait ENonFungibleTokens
 	#[endpoint]
 	#[payable("EGLD")]
 	fn clone(&self,#[payment] _payment: BigUint,ref_token_id:u64,count: u64,owner:ManagedAddress) -> SCResult<u64> {
-		let token=self.complete_token(ref_token_id);
+		let (mut token,_ref_token_id)=self.complete_token(ref_token_id);
 
 		let miner=self.get_addresses(&token,MINER);
 		require!(miner==self.blockchain().get_caller(),"E88: Seul le miner peut cloner un token");
 
 		let money=self.get_esdt(&token);
 
+		//Si ONE_WINNER=1 les tokens sont forcément tous différents car le secret doit être placé dans un des tokens
+		//on utilise celui qui est passé en référence
+		let token_title=ref_token_id.to_be_bytes().to_vec();
+		let token_description=Vec::new();
+		let token_secret=Vec::new();
+		let status=IS_CLONE;
+
+
 		let token_id=self.perform_mint(count,
 									   miner,
 									   owner,
-									   &token.title,
-									   &token.description,
-									   &token.secret,
+									   &token_title,
+									   &token_description,&token_secret,
 									   token.price,
 									   token.min_markup,
 									   token.max_markup,
@@ -128,9 +136,13 @@ pub trait ENonFungibleTokens
 									   token.miner_ratio,
 									   token.gift,
 									   &money,
-									   ref_token_id
-		);
-		return Ok(token_id)
+									   status);
+
+		//On bascule le statut du token master
+		token.status=token.status | IS_MASTER;
+		self.set_token(ref_token_id,&token);
+
+		return Ok(ref_token_id) //On retourne le ref_token_id
 	}
 
 
@@ -140,7 +152,6 @@ pub trait ENonFungibleTokens
 	#[payable("EGLD")]
 	fn mint(&self,
 			#[payment] payment: BigUint,
-			count: u64,
 			new_token_title: &Vec<u8>,
 			new_token_description: &Vec<u8>,
 			secret: &Vec<u8>,
@@ -158,8 +169,7 @@ pub trait ENonFungibleTokens
 		let mut caller=miner.clone();
 		if miner != ManagedAddress::zero() {caller=self.blockchain().get_caller();}
 
-		require!(properties & ONE_WINNER==0 || (properties & ONE_WINNER>0 && count>1 && gift>0),"E45: Le reglage de ONE_WINNER est incorrect");
-		require!(count>0,"E01: At least one token must be mined");
+		//require!(properties & ONE_WINNER==0 || (properties & ONE_WINNER>0 && gift>0),"E45: Le reglage de ONE_WINNER est incorrect");
 		require!(new_token_title.len()+new_token_description.len() > 0,"E02: Title & description can't be empty together");
 		require!(min_markup <= max_markup,"E03: L'interval de commission est incorrect");
 
@@ -172,7 +182,7 @@ pub trait ENonFungibleTokens
 		require!(money.is_egld() || money.is_valid_esdt_identifier(),"E65: Invalid money");
 
 		if money.is_egld() && (properties & ONE_WINNER==0) {
-			require!(payment>=BigUint::from(count*gift as u64),"E05: Transfert de fonds insuffisant pour le token de reference");
+			require!(payment>=BigUint::from(gift as u64),"E05: Transfert de fonds insuffisant pour le token de reference");
 		}
 
 		//On vérifie que tous les tokens devant contenir la recompense l'ont bien
@@ -181,8 +191,20 @@ pub trait ENonFungibleTokens
 		// 	require!(first_token.gift == gift,"E88: Ce token n'est pas identique à celui passé en référence");
 		// }
 
-		let token_id=self.perform_mint(count,caller,owner,new_token_title,new_token_description,secret,initial_price,min_markup,max_markup,properties,miner_ratio,gift,&money,MAX_U64);
-		return Ok(token_id)
+		let token_id=self.perform_mint(1,
+									   caller,
+									   owner,
+									   new_token_title,
+									   new_token_description,
+									   secret,
+									   initial_price,
+									   min_markup,
+									   max_markup,
+									   properties,
+									   miner_ratio,
+									   gift,
+									   &money,0u8);
+		return Ok(token_id) //On retourne le token_id
 	}
 
 
@@ -271,7 +293,7 @@ pub trait ENonFungibleTokens
 					miner_ratio:u16,
 					gift:u16,
 					money: &TokenIdentifier,
-					ref_token_id:u64) -> u64 {
+					status:u8) -> u64 {
 
 		let new_owner_current_total = self.get_token_count(&new_token_owner);
 		let total_minted = self.get_total_minted();
@@ -305,21 +327,6 @@ pub trait ENonFungibleTokens
 				}
 			}
 
-			//Economie de mémoire en remplacant les chaines de caractères par un pointeur sur le token
-			let mut token_title=new_token_title.to_vec();
-			let mut token_description=new_token_description.to_vec();
-			let mut token_secret=temp_secret.to_vec();
-
-			let mut offset=0u8;
-
-			//Si ONE_WINNER=1 les tokens sont forcément tous différents car le secret doit être placé dans un des tokens
-			if (ref_token_id!=MAX_U64) {
-				//on utilise celui qui est passé en référence
-				token_title=ref_token_id.to_be_bytes().to_vec();
-				token_description=Vec::new();
-				token_secret=Vec::new();
-				offset=IS_CLONE;
-			}
 
 			let token = Token {
 				owner:owner_addr,
@@ -327,10 +334,10 @@ pub trait ENonFungibleTokens
 				price:new_token_price.clone(),
 				resp:0u8,
 				gift:set_gift,
-				title:token_title,
-				description:token_description,
-				secret:token_secret,
-				status: offset,
+				title:new_token_title.to_vec(),
+				description:new_token_description.to_vec(),
+				secret:temp_secret.to_vec(),
+				status: status,
 				min_markup:min_markup,
 				max_markup:max_markup,
 				dealer_ids:Vec::new(),
@@ -383,7 +390,7 @@ pub trait ENonFungibleTokens
 
 			let mut token = self.get_token(token_id);
 
-			require!(caller == self.get_addresses(&token,OWNER) || (caller==self.get_addresses(&token,MINER) && token.properties & MINER_CAN_BURN>0),"E16: Only the owner account can burn token!");
+			require!(caller == self.get_addresses(&token,OWNER) || (caller == self.get_addresses(&token,MINER) && (token.properties & MINER_CAN_BURN>0)),"E16: Only the owner account can burn token!");
 
 			self.perform_burn(token_id, &mut token);
 		}
@@ -460,7 +467,7 @@ pub trait ENonFungibleTokens
 	#[endpoint]
 	fn open(&self, token_id: u64, response: &Vec<u8>) -> SCResult<Vec<u8>> {
 		require!(token_id < self.get_total_minted(), "Token does not exist!");
-		let mut token=self.complete_token(token_id);
+		let (mut token,_ref_token_id)=self.complete_token(token_id);
 
 		let caller = self.blockchain().get_caller();
 		require!(caller == self.get_addresses(&token,OWNER),"E10: Seul le propriétaire peut ouvrir le token");
@@ -515,6 +522,7 @@ pub trait ENonFungibleTokens
 
 	//Permet la mise en vente ou le retrait de la vente d'un token
 	//Seul le propriétaire du token peut le remettre en vente
+	//tag set_state
 	#[endpoint]
 	fn setstate(&self,  token_ids: Vec<u64>,new_state:u8) -> SCResult<(u64)> {
 
@@ -530,9 +538,9 @@ pub trait ENonFungibleTokens
 
 			let old_state=token.properties;
 			if new_state==1 {
-				token.properties=token.properties + FOR_SALE;
+				token.properties=token.properties | FOR_SALE;
 			} else {
-				token.properties=token.properties - FOR_SALE;
+				token.properties=token.properties & !FOR_SALE;
 			}
 
 			if token.properties!=old_state {
@@ -878,15 +886,17 @@ pub trait ENonFungibleTokens
 
 
 	//Complete la réference par la chaine complete
-	fn complete_token(&self,id: u64) -> Token {
+	fn complete_token(&self,id: u64) -> (Token,u64) {
 		let mut rc=self.get_token(id);
+		let mut ref_token_id=id;
 		if rc.status & IS_CLONE>0 {
-			let ref_token=self.get_token(rc.title.into_u64()); //Le title contient l'index du token master
+			ref_token_id=rc.title.into_u64();
+			let ref_token=self.get_token(ref_token_id); //Le title contient l'index du token master
 			rc.title=ref_token.title.clone();
 			rc.description=ref_token.description.clone();
 			rc.secret=ref_token.secret.clone();
 		}
-		return rc;
+		return (rc,ref_token_id);
 	}
 
 
@@ -921,7 +931,7 @@ pub trait ENonFungibleTokens
 		let total_minted = self.get_total_minted();
 
 		for i in 0..total_minted {
-			let mut token=self.complete_token(i);
+			let (mut token,ref_token_id)=self.complete_token(i);
 			let token_owner_addr=self.get_addresses(&token,OWNER);
 			let token_miner_addr=self.get_addresses(&token,MINER);
 
@@ -975,6 +985,7 @@ pub trait ENonFungibleTokens
 				item.append(&mut token.miner_ratio.to_be_bytes().to_vec());
 				item.append(&mut token_miner_addr.to_address().to_vec());
 				item.append(&mut i.to_be_bytes().to_vec()); //Identifiant du token
+				item.append(&mut ref_token_id.to_be_bytes().to_vec());
 
 				item.append(&mut token.title);
 				item.append(&mut token.description);
