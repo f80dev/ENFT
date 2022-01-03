@@ -10,10 +10,12 @@ mod token;
 mod dealer;
 use elrond_wasm::elrond_codec::TopDecodeInput;
 
+const CONVERT_TO_GAS:u64 	=10000000000000000; //Facteur de conversion en gas
+
 const IS_MASTER:u8    	    =0b00000010; //est utilisé par un clone (dans ce cas là le token ne peut être brulé)
 const IS_CLONE:u8    	    =0b00000001; //Le token ne peut être possédé qu'une seul fois
 
-
+//const ID_REQUIRED:u16		=0b1000000000000000;
 const FOR_SALE:u16			=0b0100000000000000;
 const ONE_WINNER:u16    	=0b0010000000000000; //Le token ne peut être possédé qu'une seul fois
 const MINER_CAN_BURN:u16	=0b0001000000000000; //Le token ne peut être possédé qu'une seul fois
@@ -167,7 +169,7 @@ pub trait ENonFungibleTokens
 	) -> SCResult<u64> {
 
 		let mut caller=miner.clone();
-		if miner != ManagedAddress::zero() {caller=self.blockchain().get_caller();}
+		if !miner.is_zero() {caller=self.blockchain().get_caller();}
 
 		//require!(properties & ONE_WINNER==0 || (properties & ONE_WINNER>0 && gift>0),"E45: Le reglage de ONE_WINNER est incorrect");
 		require!(new_token_title.len()+new_token_description.len() > 0,"E02: Title & description can't be empty together");
@@ -192,7 +194,7 @@ pub trait ENonFungibleTokens
 		// }
 
 		let token_id=self.perform_mint(1,
-									   caller,
+									   miner,
 									   owner,
 									   new_token_title,
 									   new_token_description,
@@ -295,7 +297,6 @@ pub trait ENonFungibleTokens
 					money: &TokenIdentifier,
 					status:u8) -> u64 {
 
-		let new_owner_current_total = self.get_token_count(&new_token_owner);
 		let total_minted = self.get_total_minted();
 		let first_new_id = total_minted;
 		let last_new_id = total_minted + count;
@@ -351,7 +352,6 @@ pub trait ENonFungibleTokens
 		}
 
 		self.set_total_minted(total_minted + count);
-		self.set_token_count(&new_token_owner, new_owner_current_total + count);
 		return first_new_id;
 	}
 
@@ -449,7 +449,7 @@ pub trait ENonFungibleTokens
 
 		if token.gift>0 {
 			//On récompense le participant
-			self.send_money(&token,&owner_addr,BigUint::from(10000000000000000*token.gift as u64),b"pay for gift");
+			self.send_money(&token,&owner_addr,BigUint::from(CONVERT_TO_GAS * token.gift as u64),b"pay for gift");
 			token.gift=0;
 		}
 
@@ -481,7 +481,6 @@ pub trait ENonFungibleTokens
 		//TODO: mettre en place le décryptage du secret
 		//secret=self.decrypt(&secret);
 		let eq=secret.eq(response);
-
 
 		//https://docs.rs/openssl/0.10.32/openssl/rsa/index.html
 		//let secret=v3::decrypt("secret",&enc_data);
@@ -573,7 +572,7 @@ pub trait ENonFungibleTokens
 	//Recherche un dealer par son adresse dans un token
 	fn find_dealer_in_token(&self,dealer_addr: &ManagedAddress,token:&Token) -> usize {
 		let mut rc=token.dealer_ids.len();
-		if dealer_addr != &ManagedAddress::zero() {
+		if !dealer_addr.is_zero(){
 			let addrs=self.get_dealer_addresses_for_token(&token);
 			rc=addrs.iter().position(|x| x == dealer_addr).unwrap_or(token.dealer_ids.len());
 		}
@@ -710,7 +709,7 @@ pub trait ENonFungibleTokens
 
 		for idx in 0..self.get_dealer_count() {
 			let dealer=self.get_dealer(idx);
-			if filter_miner==ManagedAddress::zero() || dealer.miners.contains(&filter_miner) {
+			if filter_miner.is_zero() || dealer.miners.contains(&filter_miner) {
 				rc.append(&mut dealer.addr.to_address().to_vec());
 				rc.push(dealer.state);
 			}
@@ -820,8 +819,8 @@ pub trait ENonFungibleTokens
 			payment_for_dealer=10000000000000000*token.dealer_markup[idx] as u64;
 		}
 
-		require!(token.properties & DIRECT_SELL>0 || dealer!=ManagedAddress::zero() ,"E31: La vente directe n'est pas autorisé");
-		require!(dealer==ManagedAddress::zero() || idx<1000 ,"E32: Le revendeur n'est pas autorisé");
+		require!(token.properties & DIRECT_SELL>0 || !dealer.is_zero() ,"E31: La vente directe n'est pas autorisé");
+		require!(dealer.is_zero() || idx<1000 ,"E32: Le revendeur n'est pas autorisé");
 
 		if(token.properties & UNIK>0){
 			//TODO ajouter ici le code
@@ -839,7 +838,7 @@ pub trait ENonFungibleTokens
 			require!(payment_for_owner >= BigUint::from(token.price.clone() as u64),"E33: Paiement du propriétaire inferieur au prix du token");
 		}
 
-		if dealer!=ManagedAddress::zero() && payment_for_dealer>0 {
+		if !dealer.is_zero() && payment_for_dealer>0 {
 			//On retribue le mineur sur la commission du distributeur
 			if token.miner_ratio>0 {
 				let payment_for_miner=1000000000000*token.dealer_markup[idx] as u64*token.miner_ratio as u64;
@@ -890,8 +889,8 @@ pub trait ENonFungibleTokens
 		let mut rc=self.get_token(id);
 		let mut ref_token_id=id;
 		if rc.status & IS_CLONE>0 {
-			ref_token_id=rc.title.into_u64();
-			let ref_token=self.get_token(ref_token_id); //Le title contient l'index du token master
+			ref_token_id=rc.title.into_u64();//Le title contient l'index du token master
+			let ref_token=self.get_token(ref_token_id);
 			rc.title=ref_token.title.clone();
 			rc.description=ref_token.description.clone();
 			rc.secret=ref_token.secret.clone();
@@ -920,6 +919,7 @@ pub trait ENonFungibleTokens
 
 
 
+	//Tag /nfts get_nfts tokens
 	//Récupérer l'ensemble des tokens en appliquant les filtres sauf si celui est à la valeur 0x0
 	//seller: uniquement les tokens dont "seller" fait parti des distributeurs déclarés
 	//owner: uniquement les tokens dont le propriétaire est "owner"
@@ -932,14 +932,15 @@ pub trait ENonFungibleTokens
 
 		for i in 0..total_minted {
 			let (mut token,ref_token_id)=self.complete_token(i);
+
 			let token_owner_addr=self.get_addresses(&token,OWNER);
 			let token_miner_addr=self.get_addresses(&token,MINER);
 
 			let idx = self.find_dealer_in_token(&seller_filter,&token);
 
-			if (owner_filter == ManagedAddress::zero() || owner_filter == token_owner_addr)
-				&& (miner_filter == ManagedAddress::zero() || miner_filter == token_miner_addr)
-				&& (seller_filter == ManagedAddress::zero() || idx < token.dealer_ids.len() ) {
+			if (owner_filter.is_zero() || owner_filter == token_owner_addr)
+				&& (miner_filter.is_zero() || miner_filter == token_miner_addr)
+				&& (seller_filter.is_zero() || idx < token.dealer_ids.len() ) {
 
 				let mut item:Vec<u8>=Vec::new();
 
@@ -1043,15 +1044,6 @@ pub trait ENonFungibleTokens
 	fn get_dealer_count(&self) -> u16;
 	#[storage_set("dealerCount")]
 	fn set_dealer_count(&self, token_count: u16);
-
-
-	#[view(tokenCount)]
-	#[storage_get("tokenCount")]
-	fn get_token_count(&self, owner: &ManagedAddress) -> u64;
-	#[storage_set("tokenCount")]
-	fn set_token_count(&self, owner: &ManagedAddress, token_count: u64);
-
-
 
 
 
