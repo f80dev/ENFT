@@ -7,14 +7,13 @@ elrond_wasm::derive_imports!();
 #[derive(NestedEncode, NestedDecode,TopEncode,TopDecode,TypeAbi)]
 pub struct Token {
      pub price: u32,
-     pub title: Vec<u8>,
-     pub description: Vec<u8>,
-     pub secret:Vec<u8>,
+
+     pub description: u64,              //Retourne un pointeur vers la description / titre du token
+     pub secret:u64,                    //Retourne un pointeur vers le secret du token
+     pub collection:u64,                //Désigne la collection du token
+
      pub gift:u16,
      pub resp:u8,                       //Reponse indiquer par le propriétaire (utilisé pour les sondages)
-
-     pub dealer_ids:Vec<u16>,          //Distributeurs autorisés
-     pub dealer_markup:Vec<u16>,        //Marge de chaque distributeur
 
      pub min_markup:u16,                //Marge minimum autorisée
      pub max_markup:u16,                //Marge maximum autorisée
@@ -26,8 +25,13 @@ pub struct Token {
      pub miner_ratio:u16,
 
      pub money:u16,                      //Reférence à une money
-     pub status:u8                      //status sur l'état du token
+     pub status:u8,                      //status sur l'état du token
      //pub deadline:u64                   //Date limite d'ouverture du token et voir la commande self.bloackc
+
+     pub dealers:u8,                    //Nombre de distributeur
+     pub dealer_ids:Vec<u32>,          //Distributeurs autorisés
+     pub dealer_markup:Vec<u16>,        //Marge de chaque distributeur
+
 }
 
 
