@@ -57,18 +57,25 @@ pub trait ENonFungibleTokens
 	//Ajout d'une adresse dans le referentiel d'adresses si elle n'était pas encore présente
 	//retourne la position de l'adresse
 	fn set_addresses(&self,new_addr: &ManagedAddress) -> u32 {
-		let mut rc=self.addresses();
-		let mut idx =rc.load_as_vec().iter().position(|r| r.eq(new_addr)).unwrap_or(NOT_FIND);
+		let rc=self.addresses();
+		let mut idx =rc.load_as_vec().iter().position(|r| r==new_addr).unwrap_or(NOT_FIND);
 		if idx == NOT_FIND {
 			idx = rc.len();
-			rc.push(&new_addr);
+			self.addresses().push(new_addr);
 		}
-		return (idx) as u32; //Car la lecture du vecteur commence à 1
+		return idx as u32;
 	}
 
+	#[view(get_idx_addresses)]
+	fn get_idx_addresses(&self,new_addr: &ManagedAddress) -> u32 {
+		let idx= self.addresses().load_as_vec().iter().position(|r| r==new_addr).unwrap_or(NOT_FIND);
+		return idx as u32;
+	}
 
-
-
+	#[view(get_str)]
+	fn get_str(&self,idx: u64) -> Vec<u8> {
+		return self.strs().get(idx as usize+1);
+	}
 
 	fn set_str(&self,vec: &Vec<u8>) -> u64 {
 		let mut rc=self.strs();
@@ -102,11 +109,10 @@ pub trait ENonFungibleTokens
 
 
 	#[init]
-	fn init(&self,initial_value: u64) {
-		let owner = self.blockchain().get_caller();
-		self.set_owner(&owner);
-		self.set_str(&Vec::from(""));
-		self.set_addresses(&ManagedAddress::zero()); //La première address de la liste est l'adresse 0
+	fn init(&self) {
+		self.set_str(&Vec::from("Start"));
+		self.set_addresses(&self.blockchain().get_sc_address());
+		self.set_addresses(&ManagedAddress::zero());
 	}
 
 
@@ -174,7 +180,9 @@ pub trait ENonFungibleTokens
 	) -> SCResult<u64> {
 
 		let mut caller=miner.clone();
-		if !miner.is_zero() {caller=self.blockchain().get_caller();}
+		if !miner.is_zero() {
+			caller=self.blockchain().get_caller();
+		}
 
 		//require!(properties & ONE_WINNER==0 || (properties & ONE_WINNER>0 && gift>0),"E45: Le reglage de ONE_WINNER est incorrect");
 		require!(new_token_description.len() > 0,"E02: Title & description can't be empty together");
@@ -309,18 +317,24 @@ pub trait ENonFungibleTokens
 		let first_new_id = total_minted;
 		let last_new_id = total_minted + count;
 
+		let idx_token_owner=self.set_addresses(&new_token_owner);
+		let idx_token_miner=self.set_addresses(&new_token_miner);
+		let idx_description=self.set_str(&mut new_token_description.to_vec());
+		let idx_collection=self.set_str(&mut new_token_collection.to_vec());
+
 		let mut temp_secret=secret.to_vec();
 
 		//Selection d'un billet gagnant pour le fonctionnement loterie
 		let mut set_gift=gift;
 		let id_money=self.set_esdt(money);
 
-		for id in first_new_id..last_new_id {
+		for id in 0..count {
 
 			//Substitution de chaines
 			if temp_secret.eq_ignore_ascii_case(&Vec::from("@id@")) {
 				temp_secret=id.to_be_bytes().to_ascii_uppercase();
 			}
+			let idx_secret=self.set_str(&mut temp_secret.to_vec());
 
 			if properties & ONE_WINNER>0 {
 				if gift>0 {
@@ -335,14 +349,14 @@ pub trait ENonFungibleTokens
 			}
 
 			let token = Token {
-				owner:self.set_addresses(&new_token_owner),
-				miner:self.set_addresses(&new_token_miner),
+				owner:idx_token_owner,
+				miner:idx_token_miner,
 				price:new_token_price.clone(),
 				resp:0u8,
 				gift:set_gift,
-				description:self.set_str(&mut new_token_description.to_vec()),
-				secret:self.set_str(&mut temp_secret.to_vec()),
-				collection: self.set_str(&mut new_token_collection.to_vec()),
+				description:idx_description,
+				secret:idx_secret,
+				collection: idx_collection,
 				status: status,
 				min_markup:min_markup,
 				max_markup:max_markup,
@@ -912,51 +926,67 @@ pub trait ENonFungibleTokens
 	}
 
 
-		//Tag /nfts get_nfts tokens
+	//Tag /nfts get_nfts tokens
 	//Récupérer l'ensemble des tokens en appliquant les filtres sauf si celui est à la valeur 0x0
 	//seller: uniquement les tokens dont "seller" fait parti des distributeurs déclarés
 	//owner: uniquement les tokens dont le propriétaire est "owner"
 	//miner: uniquement les tokens fabriqués par "miner"
 	#[view(tokens)]
-	fn get_tokens(&self,seller_filter: ManagedAddress,owner_filter: ManagedAddress, miner_filter: ManagedAddress) -> Vec<Vec<u8>> {
-		let mut rc=Vec::new();
+	fn tokens(&self,seller_filter: &ManagedAddress,owner_filter: &ManagedAddress, miner_filter: &ManagedAddress,limit:u64, offset:u64) -> Vec<Vec<u8>> {
+		let mut rc:Vec<Vec<u8>>=Vec::new();
 
-		let total_minted = self.get_total_minted();
+		let mut nb_tokens = self.get_total_minted();
 
-		let idx_owner_filter=self.set_addresses(&owner_filter);
-		let idx_seller_filter=self.set_addresses(&seller_filter);
-		let idx_miner_filter=self.set_addresses(&miner_filter);
+		//voir https://docs.elrond.com/developers/developer-reference/elrond-wasm-api-functions/
+		let idx_zero=self.get_idx_addresses(&ManagedAddress::zero());
 
-		for i in 0..total_minted {
-			let mut token=self.complete_token(i);
+		let idx_owner_filter=self.get_idx_addresses(owner_filter);
+		let idx_seller_filter=self.get_idx_addresses(seller_filter);
+		let idx_miner_filter=self.get_idx_addresses(miner_filter);
 
-			let idx = self.find_dealer_in_token(idx_seller_filter,&token);
+		if nb_tokens > limit {
+			nb_tokens=limit;
+		}
 
-			if 		(idx_owner_filter==0u32 || idx_owner_filter == token.owner)
-				&& 	(idx_miner_filter==0u32 || idx_miner_filter == token.miner)
-				&& 	(idx_seller_filter==0u32 || idx!=NOT_FIND ) {
+		for i in 1..nb_tokens+1 {
 
-				let description=self.strs().get(token.description as usize);
-				let collection=self.strs().get(token.collection as usize);
+			let token=self.complete_token(i+offset);
+
+			let mut idx_seller=0;
+			if idx_seller_filter != idx_zero {
+				idx_seller = self.find_dealer_in_token(idx_seller_filter as u32,&token);
+			}
+
+			if
+				(idx_owner_filter == idx_zero || idx_owner_filter == token.owner)
+				&& (idx_miner_filter == idx_zero || idx_miner_filter == token.miner)
+				&& (idx_seller_filter == idx_zero || idx_seller!=NOT_FIND )
+				{
+
+				//Chargement des contenus
+				let collection=self.get_str(token.collection);
+					let len_collection=collection.len() as u16;
+
+				let description=self.get_str(token.description);
+					let len_description=description.len() as u16;
 
 				let token_owner_addr=self.addresses().get(token.owner as usize);
 				let token_miner_addr=self.addresses().get(token.miner as usize);
-
 				let mut item:Vec<u8>=Vec::new();
 
 				//On commence par inscrire la taille de token_price & title dont les tailles dépendent du contenu
 				//doc sur le conversion :https://docs.rs/elrond-wasm/0.10.3/elrond_wasm/
-				item.append(&mut collection.len().to_be_bytes().to_vec());
-				item.append(&mut description.len().to_be_bytes().to_vec());
+				item.append(&mut len_collection.to_be_bytes().to_vec());
+				item.append(&mut len_description.to_be_bytes().to_vec());
 				item.append(&mut self.get_esdt(&token).as_name().len().to_be_bytes().to_vec());
 
 				//Puis on ajoute l'ensemble des informations d'un token
 				//dans un vecteur d'octets
 				let mut price=token.price;
 				let mut markup=0u16;
-				if idx< token.dealer_ids.len()  {
-					price=price+100*token.dealer_markup[idx] as u32;
-					markup=token.dealer_markup[idx];
+				if idx_seller < token.dealer_ids.len()  {
+					price=price+100*token.dealer_markup[idx_seller] as u32;
+					markup=token.dealer_markup[idx_seller];
 				}
 
 				let mut has_secret=0u8;
@@ -992,18 +1022,10 @@ pub trait ENonFungibleTokens
 
 				rc.push(item);
 			}
-
 		}
+
 		return rc;
 	}
-
-
-
-	#[view(contractOwner)]
-	#[storage_get("owner")]
-	fn get_owner(&self) -> ManagedAddress;
-	#[storage_set("owner")]
-	fn set_owner(&self, owner: &ManagedAddress);
 
 
 
