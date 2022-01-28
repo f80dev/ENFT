@@ -1,4 +1,5 @@
 #Ensemble de scripts de test du contrats
+#rechargement pour le déploiement https://r3d4.fr/faucet
 
 #Compilation et déploiement du smartcontrat (la cible testnet, devnet étant déterminée ci-dessous)
 #sed 's/\r$//' snippets.sh
@@ -31,11 +32,11 @@ ADDRESS=$(erdpy data load --key=address)
 DEPLOY_TRANSACTION=$(erdpy data load --key=deployTransaction)
 ARGUMENTS="0"
 
-#Rechargement testnet : https://r3d4.fr/elrond/testnet/index.php
+#Rechargement testnet : https://r3d4.fr/faucet
 #PROXY=https://testnet-gateway.elrond.com
 #CHAINID="T"
 
-#Rechargement devnet : https://r3d4.fr/elrond/devnet/index.php
+#Rechargement devnet : https://r3d4.fr/faucet
 PROXY=https://devnet-gateway.elrond.com
 CHAINID="D"
 
@@ -47,7 +48,7 @@ CHAINID="D"
 
 deploy() {
     clear
-    echo "Build"
+    echo "Build avec l'adresse : ${BANK}"
     build
 
     clear

@@ -32,6 +32,8 @@ pub struct Token {
      pub dealer_ids:Vec<u32>,          //Distributeurs autorisés
      pub dealer_markup:Vec<u16>,        //Marge de chaque distributeur
 
+     pub required:Vec<u64>              //L'achat de ce token necessite la possession des tokens suivants
+
 }
 
 

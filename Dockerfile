@@ -10,6 +10,7 @@ FROM ubuntu:groovy
 #ligne de commande : docker rm -f elrond-dev && docker run --name elrond-dev -v c:/Users/hhoareau/PycharmProjects/elMoney/elrond:/home/erd/dev/ -ti f80hub/elrond-testnet bash
 
 RUN apt update
+RUN apt upgrade
 RUN apt install -y wget python3 python3-venv sudo build-essential nano net-tools python3-pip
 RUN apt install -y libncurses5
 RUN pip3 install wheel
