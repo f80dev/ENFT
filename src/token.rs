@@ -28,7 +28,6 @@ pub struct Token {
      pub status:u8,                      //status sur l'état du token
      //pub deadline:u64                   //Date limite d'ouverture du token et voir la commande self.bloackc
 
-     pub dealers:u8,                    //Nombre de distributeur
      pub dealer_ids:Vec<u32>,          //Distributeurs autorisés
      pub dealer_markup:Vec<u16>,        //Marge de chaque distributeur
 
