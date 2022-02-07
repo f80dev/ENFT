@@ -2,9 +2,18 @@ use elrond_wasm::{
      types::{Vec}
 };
 use crate::{NOT_FIND, ZERO_ADDR};
-use core::ops::Index;
 
 elrond_wasm::derive_imports!();
+
+pub fn build_dealer(dealer_addr: u64) -> Dealer {
+     return Dealer {
+          state: 0,
+          addr: dealer_addr,
+          miners: Vec::new(),
+          markups:Vec::new(),
+          tokens:Vec::new()
+     }
+}
 
 #[derive(NestedEncode, NestedDecode, TopEncode, TopDecode, TypeAbi)]
 pub struct Dealer {
@@ -16,11 +25,26 @@ pub struct Dealer {
 }
 
 impl Dealer {
-     pub fn find_markup(&self,token_idx:u64) -> u16 {
-          for p in self.markups {
-               if p.0.contains(&token_idx) { return p.1 }
+     pub fn new(dealer_addr:u64) -> Self {
+          return Dealer {
+               state: 0,
+               addr: dealer_addr,
+               miners: Vec::new(),
+               markups:Vec::new(),
+               tokens:Vec::new()
           }
-          return 0u16;
+     }
+
+     pub fn get_idx(&self,id:u64) -> usize {
+          return self.tokens.iter().position(|&x|x==id).unwrap_or(NOT_FIND);
+     }
+
+     pub fn find_markup(&self,token_idx:u64) -> u16 {
+          let pos=self.get_idx(token_idx);
+          if pos!=NOT_FIND {
+               return self.markups[pos];
+          }
+          return 0;
      }
 
      pub fn is_zero(&self) -> bool {
@@ -28,42 +52,25 @@ impl Dealer {
      }
 
 
-     pub fn get_tokens(&self) -> Vec<u64> {
-          return(self.tokens);
-     }
-
 
      pub fn add_token(&mut self, token_id:u64, markup:u16) -> bool {
-          if self.check_markup(token_id,markup) {
-               self.tokens.push(token_id);
-               self.markups.push(markup);
-               true
-          } else {
-               false;
-          }
-
-     }
-
-     fn check_markup(&self,token_id:u64,new_markup:u16) -> bool {
-          let token=self.tokens_map().get(token_id as usize);
-          if new_markup > token.max_markup || new_markup < token.min_markup {
-               return false;
-          }
+          if self.tokens.contains(&token_id) {return false;}
+          self.tokens.push(token_id);
+          self.markups.push(markup);
           return true;
      }
 
 
-     pub fn set_markup(&self,token_ids:Vec<u64>,new_markup:u16) -> bool {
+
+     pub fn set_markup(&mut self,token_ids:Vec<u64>,new_markup:u16) -> bool {
           for id in token_ids {
-               if !self.check_markup(id,new_markup) {return false;}
-
+               let position=self.get_idx(id);
+               if position!=NOT_FIND {
+                    self.markups[position]=new_markup;
+               } else {
+                    self.add_token(id,new_markup);
+               }
           }
-
-          for id in token_ids {
-               let position=self.tokens.index(id);
-               self.markups[position]=new_markup;
-          }
-
           return true;
      }
 

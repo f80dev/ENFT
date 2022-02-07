@@ -1,3 +1,6 @@
+use dealer::Dealer;
+
+
 fn main(){
-    println!("Hello, world!");
+    let d=Dealer::new(1);
 }

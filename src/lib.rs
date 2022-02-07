@@ -2,11 +2,11 @@
 //Auteur: Herve Hoareau
 
 #![no_std]
+#![feature(type_ascription)]
 
 elrond_wasm::imports!();
 use token::Token;
 use dealer::Dealer;
-use core::ptr::null;
 
 mod token;
 mod dealer;
@@ -68,6 +68,8 @@ pub trait ENonFungibleTokens
 		return idx as u64;
 	}
 
+
+
 	#[view(get_idx_token_by_description)]
 	fn get_idx_token_by_desc_and_addr(&self,description: &Vec<u8>,miner:&ManagedAddress) -> u64 {
 		let idx_description=self.get_idx_str(&description);
@@ -95,7 +97,7 @@ pub trait ENonFungibleTokens
 
 	#[view(get_idx_dealer)]
 	fn get_idx_dealer(&self,idx_dealer_addr: u64) -> usize {
-		if idx_dealer_addr==ZERO_ADDR {return NOT_FIND;}
+		if idx_dealer_addr==ZERO_ADDR {return 0;}
 		//Retrouve l'index d'un dealer dans la liste des dealers
 		let idx= self.dealers_map().load_as_vec().iter().position(|r| r.addr==idx_dealer_addr).unwrap_or(NOT_FIND);
 		return idx;
@@ -148,12 +150,8 @@ pub trait ENonFungibleTokens
 	#[init]
 	fn init(&self) {
 		self.set_str(&Vec::from("Start"));
-
-		self.dealers_map().push(&Dealer {
-			state: 0,
-			addr: ZERO_ADDR,
-			miners: Vec::new()
-		});
+		let zero_addr=self.set_addresses(&ManagedAddress::zero());
+		self.dealers_map().push(&Dealer::new(zero_addr));
 
 		self.tokens_map().push(&Token {
 			owner:ZERO_ADDR,miner:ZERO_ADDR,price:0,resp:0u8,
@@ -166,7 +164,6 @@ pub trait ENonFungibleTokens
 		});
 
 		self.set_addresses(&self.blockchain().get_sc_address());
-		self.set_addresses(&ManagedAddress::zero());
 	}
 
 
@@ -254,7 +251,7 @@ pub trait ENonFungibleTokens
 									   miner_ratio,
 									   gift,
 									   &money,0u8);
-		return Ok(token_id) //On retourne le token_id
+		return Ok(token_id); //On retourne le token_id
 	}
 
 
@@ -270,7 +267,7 @@ pub trait ENonFungibleTokens
 
 		self.set_approval(token_id, &approved_address);
 
-		Ok(())
+		return Ok(());
 	}
 
 
@@ -289,7 +286,7 @@ pub trait ENonFungibleTokens
 			self.perform_revoke_approval(token_id);
 		}
 
-		Ok(())
+		return Ok(());
 	}
 
 
@@ -324,7 +321,8 @@ pub trait ENonFungibleTokens
 				return Ok(());
 			}
 		}
-		sc_error!("E14: Only the owner or the approved account may transfer the token!")
+		return Ok(());
+		//sc_error!("E14: Only the owner or the approved account may transfer the token!")
 	}
 
 
@@ -581,7 +579,7 @@ pub trait ENonFungibleTokens
 	//Permet d'ajouter un distributeur à la liste des distributeurs du token
 	//Cette fonction est réservé au propriétaire du token
 	#[endpoint]
-	fn add_dealer(&self,  token_id_start: u64,token_id_end:u64, addr: &ManagedAddress, markup:u16) -> SCResult<()> {
+	fn add_dealer(&self,  token_ids: Vec<u64>, addr: &ManagedAddress, markup:u16) -> SCResult<()> {
 		let owner_idx_addr=self.set_addresses(&self.blockchain().get_caller());
 
 		let dealer_idx = self.get_idx_dealer(self.get_idx_addresses(addr));
@@ -589,24 +587,19 @@ pub trait ENonFungibleTokens
 
 		let mut dealer:Dealer=self.dealers_map().get(dealer_idx);
 
-		let token_ids=Vec::new();
-		for token_id in token_id_start..token_id_end {
-			require!(token_id < self.get_total_minted(), "E20: Token does not exist!");
-			let mut token = self.tokens_map().get(token_id as usize);
-
+		for token_id in token_ids.clone() {
+			let token = self.tokens_map().get(token_id as usize);
 			require!(token.owner == owner_idx_addr,"E21: Only token owner can add dealer");
-			token_ids.push(token_id);
 		}
 
+		dealer.set_markup(token_ids.clone(),markup);
 
-		dealer.set_markup(token_ids,markup);
 
-
-		self.dealers_map().set(dealer_idx,&dealer);
+		//self.dealers_map().set(dealer_idx,&dealer);
 
 		return Ok(());
 
-		sc_error!("le miner du token n'est pas autorisé par le dealer")
+		//sc_error!("le miner du token n'est pas autorisé par le dealer")
 	}
 
 
@@ -723,7 +716,7 @@ pub trait ENonFungibleTokens
 			self.dealers_map().push(&new_dealer);
 			dealer_idx=self.dealers_map().len();
 		}
-		Ok(dealer_idx)
+		return Ok(dealer_idx)
 	}
 
 
@@ -798,7 +791,7 @@ pub trait ENonFungibleTokens
 	//efface l'ensemble des distributeurs
 	#[endpoint]
 	fn clear_dealer(&self,  token_id: u64) -> SCResult<()> {
-		let mut token = self.tokens_map().get(token_id as usize);
+		let token = self.tokens_map().get(token_id as usize);
 
 		let caller=self.blockchain().get_caller();
 
@@ -812,28 +805,23 @@ pub trait ENonFungibleTokens
 
 
 
+
 	//Modifier le prix (dans la fourchette initialement défini par le mineur du token)
 	//Seul les distributeurs peuvent modifier le prix
 	#[endpoint]
 	fn price(&self, token_ids: Vec<u64>, markup: u16) -> SCResult<()> {
-		require!(token_id_start < self.get_total_minted(), "E24: Token does not exist!");
-		require!(token_id_end < self.get_total_minted(), "E24: Token does not exist!");
 
 		let dealer_idx = self.get_idx_dealer(self.get_idx_addresses(&self.blockchain().get_caller()));
-		require!(dealer_idx!=NOT_FIND, "E25: Modif de prix uniquement pour les distributeurs");
+		require!(dealer_idx!=NOT_FIND, "E25: Distributeur inconnu");
 
-		let dealer:Dealer=self.dealers_map().get(dealer_idx);
+		let mut dealer:Dealer=self.dealers_map().get(dealer_idx);
 
+		for token_id in token_ids.clone() {
+			let token=self.tokens_map().get(token_id as usize);
+			require!(markup <= token.max_markup && markup >= token.min_markup,"E89: Interval de modification du prix dépassé");
+		}
 
-		let markup=dealer.set_markup(token_ids,markup);
-
-
-		let idx = addrs.iter().position(|x| x == &caller).unwrap_or(NOT_FIND);
-
-
-
-		token.dealer_markup[idx] = markup;
-		self.tokens_map().set(token_id as usize,&token);
+		dealer.set_markup(token_ids.clone(),markup);
 
 		return Ok(());
 	}
@@ -852,11 +840,9 @@ pub trait ENonFungibleTokens
 
 		let dealer:Dealer=self.dealers_map().get(self.get_idx_dealer(self.get_idx_addresses(&dealer_addr)));
 
-		require!(token_id <= self.get_total_minted(), "E28: Ce token n'existe pas");
 		let mut token = self.tokens_map().get(token_id as usize);
 
-		let caller=self.blockchain().get_caller();
-		let idx_caller=self.get_idx_addresses(&caller);
+		let idx_caller=self.get_idx_addresses(&self.blockchain().get_caller());
 		require!(token.owner != idx_caller,"E29: Ce token vous appartient déjà");
 		require!(token.properties & FOR_SALE>0,"E30: Ce token n'est pas en vente");
 
@@ -871,17 +857,10 @@ pub trait ENonFungibleTokens
 			require!(bc,"E66: Vous ne posséder pas les tokens requis")
 		}
 
-
-		let addrs=self.get_dealer_addresses_for_token(token_id);
-		let idx = addrs.iter().position(|x| x == &idx_dealer_addr).unwrap_or(NOT_FIND);
-
-		let mut payment_for_dealer=0u64;
-		if idx!=NOT_FIND {
-			payment_for_dealer=10000000000000000*(if idx!=NOT_FIND {self.dealers_map().get(idx).find_markup(token_id) as u64} else {0});
-		}
+		//On retrouve le distributeur du token
+		let mut payment_for_dealer=10000000000000000*(dealer.find_markup(token_id) as u64);
 
 		require!(token.properties & DIRECT_SELL>0 || !dealer.is_zero() ,"E31: La vente directe n'est pas autorisé");
-		require!(dealer.is_zero() || idx<1000 ,"E32: Le revendeur n'est pas autorisé");
 
 		if(token.properties & UNIK>0){
 			//TODO ajouter ici le code
@@ -916,7 +895,7 @@ pub trait ENonFungibleTokens
 		}
 
 		token.properties=&token.properties & !FOR_SALE;//Le token n'est plus a vendre
-		token.owner=self.set_addresses(&caller); //On change le propriétaire
+		token.owner=idx_caller; //On change le propriétaire
 		self.tokens_map().set(token_id as usize,&token);
 
 		return Ok(());
@@ -927,7 +906,7 @@ pub trait ENonFungibleTokens
 	fn get_dealer_addresses_for_token(&self,id_token:u64 ) -> Vec<u64> {
 		let mut rc=Vec::new();
 		for dealer in self.dealers_map().load_as_vec(): Vec<Dealer> {
-			if dealer.get_tokens().contains(&id_token){
+			if dealer.tokens.contains(&id_token){
 				rc.push(dealer.addr);
 				break;
 			}
@@ -1012,6 +991,12 @@ pub trait ENonFungibleTokens
 					let token_owner_addr=self.get_addresses(token.owner);
 					let token_miner_addr=self.get_addresses(token.miner);
 
+					let mut markup=0;
+					if idx_dealer!=NOT_FIND {
+						let dealer:Dealer=self.dealers_map().get(idx_dealer);
+						markup=dealer.find_markup(i+offset);
+					}
+
 					let mut item:Vec<u8>=Vec::new();
 
 					//On commence par inscrire la taille de token_price & title dont les tailles dépendent du contenu
@@ -1074,7 +1059,6 @@ pub trait ENonFungibleTokens
 	// fn get_token_owner(&self, token_id: u64) -> ManagedAddress;
 	// #[storage_set("tokenOwner")]
 	// fn set_token_owner(&self, token_id: u64, owner: &ManagedAddress);
-
 
 
 
