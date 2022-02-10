@@ -366,7 +366,6 @@ pub trait ENonFungibleTokens
 					status:u8) -> Vec<u64> {
 
 		let mut rc:Vec<u64>=Vec::new();
-		let total_minted = self.get_total_minted();
 
 		let idx_token_owner=self.set_addresses(&new_token_owner);
 		let idx_token_miner=self.set_addresses(&new_token_miner);
@@ -978,7 +977,7 @@ pub trait ENonFungibleTokens
 	}
 
 
-	fn tokens_to_vec(&self,token:Token,markup:u32,token_id:u64) -> Vec<u8> {
+	fn token_to_vec(&self,token:Token,markup:u32,token_id:u64) -> Vec<u8> {
 		//Chargement des contenus
 		let collection=self.get_str(token.collection);
 		let len_collection=collection.len() as u16;
@@ -1061,16 +1060,16 @@ pub trait ENonFungibleTokens
 				i=i+1;
 				if limit<=i {break;}
 				if (idx_owner_filter == ZERO_ADDR || idx_owner_filter == token.owner) && (idx_miner_filter == ZERO_ADDR || idx_miner_filter == token.miner) {
-					rc.append(&self.tokens_to_vec(token,0u32,i));
+					rc.push(self.token_to_vec(token,0u32,i));
 				}
 			}
 		} else {
 			let idx_dealer=self.get_idx_dealer(idx_dealer_filter);
 			let dealer:Dealer = self.dealers_map().get(idx_dealer);
-			for token_id in dealer.tokens {
+			for token_id in dealer.tokens.clone() {
 				let token=self.tokens_map().get(token_id as usize);
 				let markup=dealer.find_markup(token_id) as u32;
-				rc.append(&self.tokens_to_vec(token,markup,token_id));
+				rc.push(self.token_to_vec(token,markup,token_id));
 			}
 		}
 
