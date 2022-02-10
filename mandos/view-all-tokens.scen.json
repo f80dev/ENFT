@@ -1,0 +1,56 @@
+{
+  "name": "Tokens views on direct sell",
+  "gasSchedule": "dummy",
+  "steps": [
+    {
+      "step": "externalSteps",
+      "path": "mint-token.scen.json"
+    },
+    {
+      "txId": "tokens_view_paul",
+      "step": "scCall",
+      "tx": {
+        "from": "address:my_address",
+        "to": "sc:enonfungibletokens",
+        "function": "tokens",
+        "arguments": [
+          "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "address:paul",
+          "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "100","0"
+        ],
+        "gasLimit": "100,000,000",
+        "gasPrice": "0"
+      },
+      "expect": {
+        "out": ["0x00000082000a000b000000040000000245474c447061756c5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f014007000000000000000000007061756c5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f00000000000000020000000000000002636f6c6c656374696f6e6465736372697074696f6e00000082000a000b000000040000000245474c447061756c5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f014007000000000000000000007061756c5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f00000000000000030000000000000002636f6c6c656374696f6e6465736372697074696f6e"],
+        "status": "",
+        "gas": "*",
+        "refund": "*"
+      }
+    },
+    {
+      "txId": "tokens_view_all",
+      "step": "scCall",
+      "tx": {
+        "from": "address:my_address",
+        "to": "sc:enonfungibletokens",
+        "function": "tokens",
+        "arguments": [
+          "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "100","0"
+        ],
+        "gasLimit": "100,000,000",
+        "gasPrice": "0"
+      },
+      "expect": {
+        "out": ["0x00000082000a000b000000040000000245474c447061756c5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f014007000000000000000000007061756c5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f00000000000000020000000000000002636f6c6c656374696f6e6465736372697074696f6e00000082000a000b000000040000000245474c447061756c5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f014007000000000000000000007061756c5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f00000000000000030000000000000002636f6c6c656374696f6e6465736372697074696f6e"],
+        "status": "",
+        "gas": "*",
+        "refund": "*"
+      }
+    }
+  ]
+}

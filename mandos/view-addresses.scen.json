@@ -1,0 +1,49 @@
+{
+  "name": "Addresses views",
+  "gasSchedule": "dummy",
+  "steps": [
+    {
+      "step": "externalSteps",
+      "path": "enonfungibletokens-init.scen.json"
+    },
+    {
+      "step": "scCall",
+      "txId": "addresses_view",
+      "tx": {
+        "from": "address:my_address",
+        "to": "sc:enonfungibletokens",
+        "function": "addresses",
+        "arguments": [],
+        "gasLimit": "100,000,000",
+        "gasPrice": "0"
+      },
+      "expect": {
+        "out": [
+          "sc:enonfungibletokens",
+          "0x0000000000000000000000000000000000000000000000000000000000000000"
+        ],
+        "status": "",
+        "gas": "*",
+        "refund": "*"
+      }
+    },
+    {
+      "txId": "get_idx_addresses for zero_address",
+      "step": "scCall",
+      "tx": {
+        "from": "address:my_address",
+        "to": "sc:enonfungibletokens",
+        "function": "get_idx_addresses",
+        "arguments": ["0x0000000000000000000000000000000000000000000000000000000000000000"],
+        "gasLimit": "100,000,000",
+        "gasPrice": "0"
+      },
+      "expect": {
+        "out": ["1"],
+        "status": "",
+        "gas": "*",
+        "refund": "*"
+      }
+    }
+  ]
+}

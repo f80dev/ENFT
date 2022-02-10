@@ -1,6 +1,7 @@
 use elrond_wasm::{
      types::{Vec}
 };
+
 use crate::{NOT_FIND, ZERO_ADDR};
 
 elrond_wasm::derive_imports!();
@@ -27,13 +28,14 @@ pub struct Dealer {
 impl Dealer {
      pub fn new(dealer_addr:u64) -> Self {
           return Dealer {
-               state: 0,
+               state: 1,
                addr: dealer_addr,
                miners: Vec::new(),
                markups:Vec::new(),
                tokens:Vec::new()
           }
      }
+
 
      pub fn get_idx(&self,id:u64) -> usize {
           return self.tokens.iter().position(|&x|x==id).unwrap_or(NOT_FIND);
@@ -59,6 +61,7 @@ impl Dealer {
           self.markups.push(markup);
           return true;
      }
+
 
 
 

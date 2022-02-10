@@ -1,0 +1,95 @@
+{
+  "name": "Mint one token ",
+  "comment": "https://github.com/ElrondNetwork/elrond-wasm-rs/blob/master/contracts/examples/lottery-esdt/mandos/buy-ticket.scen.json",
+  "gasSchedule": "dummy",
+  "steps": [
+    {
+      "step": "externalSteps",
+      "path": "enonfungibletokens-init.scen.json"
+    },
+    {
+      "step": "scCall",
+      "txId": "mint",
+      "tx": {
+        "from": "address:paul",
+        "to": "sc:enonfungibletokens",
+        "function": "mint",
+        "arguments": [
+          "2",
+          "str:collection","str:description",
+          "0",
+          "str:monsecret",
+          "2",
+          "0",
+          "0",
+          "0x4007",
+          "address:paul","address:paul",
+          "0",
+          "1",
+          {
+            "esdtValue": [
+              {
+                "tokenIdentifier": "",
+                "value": "0"
+              }
+            ]
+          }
+        ],
+        "gasLimit": "100,000,000",
+        "gasPrice": "0",
+        "value": "2"
+      },
+      "expect": {
+        "out": ["0x00000000000000010000000000000002"],
+        "status": "",
+        "gas": "*",
+        "refund": "*"
+      }
+    },
+    {
+      "step": "scCall",
+      "txId": "setstate",
+      "tx": {
+        "from": "address:paul",
+        "to": "sc:enonfungibletokens",
+        "function": "setstate",
+        "arguments": [
+          ["u64:2"],"1"
+        ],
+        "gasLimit": "100,000,000",
+        "gasPrice": "0"
+      },
+      "expect": {
+        "out": ["0"],
+        "status": "",
+        "gas": "*",
+        "refund": "*"
+      }
+    },
+    {
+      "step": "checkState",
+      "accounts": {
+        "address:my_address": {
+          "nonce": "1",
+          "balance": "1,000,000",
+          "storage": {}
+        },
+        "address:paul": {
+          "nonce": "2",
+          "balance": "999,998",
+          "storage": {}
+        },
+        "address:sophie": {
+          "nonce": "0",
+          "balance": "1,000,000",
+          "storage": {}
+        },
+        "sc:enonfungibletokens": {
+          "nonce": "0",
+          "balance": "2",
+          "code": "file:../output/enonfungibletokens.wasm"
+        }
+      }
+    }
+  ]
+}

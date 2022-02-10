@@ -1,0 +1,28 @@
+{
+  "name": "Roger become dealer",
+  "gasSchedule": "dummy",
+  "steps": [
+    {
+      "step": "externalSteps",
+      "path": "enonfungibletokens-init.scen.json"
+    },
+    {
+      "step": "scCall",
+      "txId": "new_dealer",
+      "tx": {
+        "from": "address:my_address",
+        "to": "sc:enonfungibletokens",
+        "function": "new_dealer",
+        "arguments": [],
+        "gasLimit": "100,000,000",
+        "gasPrice": "0"
+      },
+      "expect": {
+        "out": ["1"],
+        "status": "",
+        "gas": "*",
+        "refund": "*"
+      }
+    }
+  ]
+}
