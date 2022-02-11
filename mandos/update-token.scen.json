@@ -1,0 +1,51 @@
+{
+  "name": "Buy by direct sell one token at 2 egld",
+  "comment": "mise a jour de la description du token par son créateur",
+  "gasSchedule": "dummy",
+  "steps": [
+    {
+      "step": "externalSteps",
+      "path": "mint-token.scen.json"
+    },
+    {
+      "txId": "setstate pour retirer le token de la vente",
+      "step": "scCall",
+      "tx": {
+        "from": "address:paul",
+        "to": "sc:enonfungibletokens",
+        "function": "setstate",
+        "arguments": [
+          ["u64:2"],"0"
+        ],
+        "gasLimit": "100,000,000",
+        "gasPrice": "0"
+      },
+      "expect": {
+        "out": ["1"],
+        "status": "",
+        "gas": "*",
+        "refund": "*"
+      }
+    },
+    {
+      "step": "scCall",
+      "txId": "update NFT",
+      "tx": {
+        "from": "address:paul",
+        "to": "sc:enonfungibletokens",
+        "function": "update",
+        "arguments": [
+          "2","str:description","str:trop bien"
+        ],
+        "gasLimit": "100,000,000",
+        "gasPrice": "0"
+      },
+      "expect": {
+        "out": [],
+        "status": "*",
+        "gas": "*",
+        "refund": "*"
+      }
+    }
+  ]
+}

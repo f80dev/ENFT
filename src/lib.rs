@@ -58,6 +58,7 @@ pub trait ENonFungibleTokens
 
 	//Ajout d'une adresse dans le referentiel d'adresses si elle n'était pas encore présente
 	//retourne la position de l'adresse
+	#[view(set_addresses)]
 	fn set_addresses(&self,new_addr: &ManagedAddress) -> u64 {
 		let rc=self.addresses();
 		let mut idx =rc.load_as_vec().iter().position(|r| r==new_addr).unwrap_or(NOT_FIND);
@@ -139,10 +140,6 @@ pub trait ENonFungibleTokens
 
 
 
-	//Retourne une adresse de token du référentiel d'adresses
-	fn get_esdt(&self,token: &Token) -> TokenIdentifier {
-		return self.esdt_map().get(token.money as usize);
-	}
 
 
 	fn dealer_to_vec(&self,dealer: &Dealer) -> Vec<u8> {
@@ -159,7 +156,10 @@ pub trait ENonFungibleTokens
 		self.set_addresses(&self.blockchain().get_sc_address());
 		self.set_addresses(&ManagedAddress::zero());
 
+		self.esdt_map().push(&TokenIdentifier::egld());
+
 		self.set_str(&Vec::from("Start"));
+
 		self.dealers_map().push(&Dealer::new(ZERO_ADDR));
 
 		self.tokens_map().push(&Token {
@@ -185,15 +185,30 @@ pub trait ENonFungibleTokens
 
 	#[endpoint(clone)]
 	#[payable("EGLD")]
-	fn clone(&self,#[payment] _payment: BigUint, ref_token_id: u64,count: u64,_owner: ManagedAddress) -> SCResult<u64> {
-		let token=self.complete_token(ref_token_id);
+	fn clone(&self, ref_token_id: u64,count: u64,owner: ManagedAddress) -> SCResult<Vec<u64>> {
+		let mut token=self.tokens_map().get(ref_token_id as usize);
 		require!(token.miner==self.get_idx_addresses(&self.blockchain().get_caller()),"E88: Seul le miner peut cloner un token");
 
-		for _i in 0..count {
-			self.tokens_map().push(&token);
+		//TODO: ajouter la vérification de l'autorisation de cloner
+
+		let (payment, _pay_token)=self.call_value().payment_token_pair();
+		let money=self.esdt_map().get(token.money as usize);
+		if money.is_egld() && (token.properties & ONE_WINNER==0) && token.gift>0 {
+			require!(payment == BigUint::from(token.gift as u64)*count,"E05: Transfert de fonds ne correspond pas au NFT");
 		}
 
-		return Ok(ref_token_id) //On retourne le ref_token_id
+		let new_owner_addr=self.get_idx_addresses(&owner);
+		if new_owner_addr!=ZERO_ADDR {
+			token.owner=new_owner_addr;
+		}
+
+		let mut rc=Vec::new();
+		for _i in 0..count {
+			self.tokens_map().push(&token);
+			rc.push(self.get_total_minted());
+		}
+
+		return Ok(rc) //On retourne le ref_token_id
 	}
 
 
@@ -234,12 +249,13 @@ pub trait ENonFungibleTokens
 		//voir https://github.com/ElrondNetwork/elrond-wasm-rs/blob/ed98b2b02bf95b7457c372f51b485ab69e019b58/elrond-wasm/src/types/general/token_identifier.rs
 
 		require!(money.is_egld() || money.is_valid_esdt_identifier(),"E65: Invalid money");
+		require!(gift==0 || miner==self.blockchain().get_caller(),"E88: Le créateur doit être le mineur si le token contient des fonds");
 
 		if money.is_egld() && (properties & ONE_WINNER==0) {
-			require!(payment>=BigUint::from(gift as u64)*count,"E05: Transfert de fonds insuffisant pour le token de reference");
+			require!(payment == BigUint::from(gift as u64)*count,"E05: Transfert de fonds ne correspond pas au NFT");
 		}
 
-		require!(required_token==0 || required_token<self.get_total_minted(),"E88: Le token requis n'existe pas");
+		require!(required_token==0 || required_token<=self.get_total_minted(),"E88: Le token requis n'existe pas");
 
 		//On vérifie que tous les tokens devant contenir la recompense l'ont bien
 		// if properties & ONE_WINNER==0 && ref_token_id!=MAX_U64 {
@@ -263,10 +279,10 @@ pub trait ENonFungibleTokens
 									   &money,0u8);
 
 		//Ajout systèmatique au direct store
-		let mut direct_store:Dealer=self.dealers_map().get(self.get_idx_dealer(ZERO_ADDR));
-		for token_id in token_ids.clone() {
-			direct_store.add_token(token_id,0);
-		}
+		// let mut direct_store:Dealer=self.dealers_map().get(self.get_idx_dealer(ZERO_ADDR));
+		// for token_id in token_ids.clone() {
+		// 	direct_store.add_token(token_id,0);
+		// }
 
 
 		return Ok(token_ids); //On retourne le token_id
@@ -374,9 +390,8 @@ pub trait ENonFungibleTokens
 
 		let mut temp_secret=secret.to_vec();
 
-		//Selection d'un billet gagnant pour le fonctionnement loterie
+		//TODO Ajouter la Selection d'un billet gagnant pour le fonctionnement loterie
 		let mut set_gift=gift;
-		let id_money=self.set_esdt(money);
 
 		let mut required_tokens:Vec<u64>=Vec::new();
 		if required_token>0 {
@@ -418,12 +433,12 @@ pub trait ENonFungibleTokens
 				max_markup:max_markup,
 				properties:properties,
 				miner_ratio:miner_ratio,
-				money: id_money,
+				money: self.set_esdt(money),
 				required:required_tokens.to_vec(),
 			};
 
 			self.tokens_map().push(&token);
-			rc.push(id);
+			rc.push(id+1);
 		}
 
 		return rc;
@@ -441,7 +456,7 @@ pub trait ENonFungibleTokens
 		if token.gift>0 {
 			let miner_addr=self.get_addresses(token.miner);
 			//Remboursement du créateur
-			self.send_money(&token,&miner_addr,BigUint::from(token.gift as u64*10000000000000000),b"Miner refund");
+			self.send_money(token.money,&miner_addr,BigUint::from(token.gift as u64),b"Miner refund");
 		}
 
 		token.miner=0;
@@ -456,10 +471,9 @@ pub trait ENonFungibleTokens
 	#[endpoint(burn)]
 	fn burn(&self, token_ids: Vec<u64>) -> SCResult<()> {
 		let caller = self.blockchain().get_caller();
-		let total_minted=self.get_total_minted();
 
 		for token_id in token_ids {
-			require!(token_id< total_minted, "E15: Token does not exist!");
+			require!(token_id<= self.get_total_minted(), "E15: Token does not exist!");
 
 			let mut token = self.tokens_map().get(token_id as usize);
 
@@ -473,27 +487,23 @@ pub trait ENonFungibleTokens
 
 
 
-
-	fn send_money(&self,token:&Token,dest:&ManagedAddress, amount:BigUint, comment:&[u8]) {
-		let money=self.get_esdt(&token);
-		if money.is_egld() {
-			self.send().direct_egld(dest,&amount,comment);
-		} else {
-			self.send().direct(dest, &money, 0,&(amount), comment);
-		}
+	//voir https://docs.elrond.com/developers/developer-reference/elrond-wasm-api-functions/#send-api
+	fn send_money(&self,identifier:u16,dest:&ManagedAddress, amount:BigUint, comment:&[u8]) {
+		let money=self.esdt_map().get(identifier as usize);
+		self.send().direct(dest, &money, 0,&(amount), comment);
 	}
 
 
 
 	//Mise a jour du token
-	#[endpoint(udpate)]
+	#[endpoint(update)]
 	fn update(&self, token_id: u64, field_name: &Vec<u8>,new_value: &Vec<u8>) -> SCResult<()>  {
-		require!(token_id < self.get_total_minted(), "Token does not exist!");
+		require!(token_id <= self.get_total_minted(), "Token does not exist!");
 		let mut token=self.tokens_map().get(token_id as usize);
 
 		let caller = self.set_addresses(&self.blockchain().get_caller());
 		require!(caller == token.owner,"E10: Seul le propriétaire peut mettre a jour le NFT");
-		require!(token.properties & FOR_SALE==0,"E52: Le token ne doit pas être en vente");
+		require!(token.properties & FOR_SALE==0,"E52: Le NFT ne doit pas être en vente pour être modifié");
 		require!(caller == token.miner,"Seul le créateur peut mettre a jour le token");
 
 		if field_name.eq_ignore_ascii_case(&Vec::from("description")) {
@@ -512,7 +522,7 @@ pub trait ENonFungibleTokens
 	#[endpoint(answer)]
 	fn answer(&self, token_id: u64, response: u8) -> SCResult<()> {
 
-		require!(token_id < self.get_total_minted(), "Token does not exist!");
+		require!(token_id <= self.get_total_minted(), "Token does not exist!");
 		let mut token=self.tokens_map().get(token_id as usize);
 
 		let owner_addr=self.get_addresses(token.owner);
@@ -521,7 +531,7 @@ pub trait ENonFungibleTokens
 
 		if token.gift>0 {
 			//On récompense le participant
-			self.send_money(&token,&owner_addr,BigUint::from(CONVERT_TO_GAS * token.gift as u64),b"pay for gift");
+			self.send_money(token.money,&owner_addr,BigUint::from(token.gift as u64),b"pay for gift");
 			token.gift=0;
 		}
 
@@ -538,8 +548,8 @@ pub trait ENonFungibleTokens
 	//Si Response est non vide et Gift positif alors si response == secret on transfert le gift
 	#[endpoint(open)]
 	fn open(&self, token_id: u64, response: &Vec<u8>) -> SCResult<Vec<u8>> {
-		require!(token_id < self.get_total_minted(), "Token does not exist!");
-		let mut token=self.complete_token(token_id);
+		require!(token_id <= self.get_total_minted(), "Token does not exist!");
+		let mut token=self.tokens_map().get(token_id as usize);
 
 		let caller = self.blockchain().get_caller();
 		require!(caller == self.get_addresses(token.owner),"E10: Seul le propriétaire peut ouvrir le token");
@@ -560,7 +570,7 @@ pub trait ENonFungibleTokens
 		if token.gift>0 {
 			//Si on est pas obligé de trouver le secret ou si la réponse est égale au secret on distribue les gains
 			if token.properties & FIND_SECRET==0 || eq {
-				self.send_money(&token,&self.get_addresses(token.owner),BigUint::from(10000000000000000*token.gift as u64),b"pay for gift");
+				self.send_money(token.money,&self.get_addresses(token.owner),BigUint::from(token.gift),b"pay for gift");
 				token.gift=0;
 				self.tokens_map().set(token_id as usize,&token);
 				if secret.len()==0 {secret=Vec::from("Gagné");}
@@ -630,9 +640,10 @@ pub trait ENonFungibleTokens
 
 		let mut rc=0;
 		let caller_addr=self.set_addresses(&self.blockchain().get_caller());
-		for token_id in token_ids {
-			require!(token_id < self.get_total_minted(), "E19: Token does not exist!");
 
+		for token_id in token_ids {
+
+			require!(token_id <= self.get_total_minted(), "E19: Token does not exist!");
 			let mut token = self.tokens_map().get(token_id as usize);
 
 			require!(caller_addr == token.owner ,"E17: Only token owner change state");
@@ -821,7 +832,7 @@ pub trait ENonFungibleTokens
 
 		let caller=self.blockchain().get_caller();
 
-		require!(token_id < self.get_total_minted(), "E22: Token does not exist!");
+		require!(token_id <= self.get_total_minted(), "E22: Token does not exist!");
 		require!(self.get_addresses(token.owner) == caller,"E23: Only token owner can remove dealer");
 
 		self.tokens_map().set(token_id as usize,&token);
@@ -858,17 +869,16 @@ pub trait ENonFungibleTokens
 	//Voir l'exemple de la fonction fund dans https://github.com/ElrondNetwork/elrond-wasm-rs/blob/master/contracts/examples/crowdfunding-esdt/src/crowdfunding_esdt.rs
 	#[payable("EGLD")]
 	#[endpoint]
-	fn buy(&self, token_id: u64,dealer_addr:ManagedAddress) -> SCResult<()> {
-
+	fn buy(&self, token_id: u64,dealer_addr:ManagedAddress) -> SCResult<(u64)> {
 		let (payment, _pay_token)=self.call_value().payment_token_pair();
-
 
 		let idx_dealer=self.get_idx_dealer(self.get_idx_addresses(&dealer_addr));
 		require!(idx_dealer != NOT_FIND,"E55: Distributeur inconnu");
 
+		require!(token_id <= self.get_total_minted(), "E19: Token does not exist!");
 		let mut token = self.tokens_map().get(token_id as usize);
 
-		let idx_caller=self.get_idx_addresses(&self.blockchain().get_caller());
+		let idx_caller=self.set_addresses(&self.blockchain().get_caller());
 		require!(token.owner != idx_caller,"E29: Ce token vous appartient déjà");
 		require!(token.properties & FOR_SALE>0,"E30: Ce token n'est pas en vente");
 
@@ -885,7 +895,7 @@ pub trait ENonFungibleTokens
 
 		//On retrouve le distributeur du token
 		let dealer:Dealer=self.dealers_map().get(idx_dealer);
-		let mut payment_for_dealer=10000000000000000*(dealer.find_markup(token_id) as u64);
+		let mut payment_for_dealer=CONVERT_TO_GAS*(dealer.find_markup(token_id) as u64);
 
 		require!(token.properties & DIRECT_SELL>0 || !dealer.is_zero() ,"E31: La vente directe n'est pas autorisé");
 
@@ -898,9 +908,9 @@ pub trait ENonFungibleTokens
 		//calcul du payment au owner
 		let mut payment_for_owner=payment-BigUint::from(payment_for_dealer);
 		//Dans le cas d'un ESDT on corrige la valeur de payment en attendant de savoir comment la passer en argument depuis python
-		let money=self.get_esdt(&token);
+		let money=self.esdt_map().get(token.money as usize);
 		if money.is_esdt() {
-			payment_for_owner=BigUint::from(10000000000000000*token.price as u64)-BigUint::from(payment_for_dealer);
+			payment_for_owner=BigUint::from(CONVERT_TO_GAS*token.price as u64)-BigUint::from(payment_for_dealer);
 		} else {
 			require!(payment_for_owner == BigUint::from(token.price.clone() as u64),"E33: Paiement non égale à celui du token");
 		}
@@ -909,23 +919,23 @@ pub trait ENonFungibleTokens
 			//On retribue le mineur sur la commission du distributeur
 			if token.miner_ratio>0 {
 				let payment_for_miner=1000000000000*dealer.find_markup(token_id) as u64*token.miner_ratio as u64;
-				self.send_money(&token,&self.get_addresses(token.miner),BigUint::from(payment_for_miner),b"miner pay");
+				self.send_money(token.money,&self.get_addresses(token.miner),BigUint::from(payment_for_miner),b"miner pay");
 				payment_for_dealer=payment_for_dealer-payment_for_miner;
 			}
 
 			//Transaction issue d'un revendeur
-			self.send_money(&token,&self.get_addresses(dealer.addr),BigUint::from(payment_for_dealer),b"dealer pay");
+			self.send_money(token.money,&self.get_addresses(dealer.addr),BigUint::from(payment_for_dealer),b"dealer pay");
 		}
 
 		if payment_for_owner > BigUint::from(0u64) {
-			self.send_money(&token,&self.get_addresses(token.owner),payment_for_owner,b"owner pay");
+			self.send_money(token.money,&self.get_addresses(token.owner),payment_for_owner,b"owner pay");
 		}
 
 		token.properties=&token.properties & !FOR_SALE;//Le token n'est plus a vendre
 		token.owner=idx_caller; //On change le propriétaire
 		self.tokens_map().set(token_id as usize,&token);
 
-		return Ok(());
+		return Ok((token_id));
 	}
 
 
@@ -952,10 +962,6 @@ pub trait ENonFungibleTokens
 	}
 
 
-	//Complete la réference par la chaine complete
-	fn complete_token(&self,id: u64) -> Token {
-		return self.tokens_map().get(id as usize);
-	}
 
 
 	fn _is_in(&self,token: &Token , _list_tokens:&Vec<Token>) -> bool {
@@ -977,7 +983,7 @@ pub trait ENonFungibleTokens
 	}
 
 
-	fn token_to_vec(&self,token:Token,markup:u32,token_id:u64) -> Vec<u8> {
+	fn token_to_vec(&self,token:Token,markup:u16,token_id:u64) -> Vec<u8> {
 		//Chargement des contenus
 		let collection=self.get_str(token.collection);
 		let len_collection=collection.len() as u16;
@@ -995,11 +1001,11 @@ pub trait ENonFungibleTokens
 		//doc sur le conversion :https://docs.rs/elrond-wasm/0.10.3/elrond_wasm/
 		item.append(&mut len_collection.to_be_bytes().to_vec());
 		item.append(&mut len_description.to_be_bytes().to_vec());
-		item.append(&mut self.get_esdt(&token).as_name().len().to_be_bytes().to_vec());
+		item.append(&mut self.esdt_map().get(token.money as usize).as_name().len().to_be_bytes().to_vec());
 
 		//Puis on ajoute l'ensemble des informations d'un token
 		//dans un vecteur d'octets
-		let price=token.price+100*markup;
+		let price=token.price+100*markup as u32;
 
 		let mut has_secret=0u8;
 		if token.secret>0 || token.gift>0 {
@@ -1007,7 +1013,7 @@ pub trait ENonFungibleTokens
 		}
 
 		item.append(&mut price.to_be_bytes().to_vec());
-		item.append(&mut self.get_esdt(&token).as_name().into_vec());
+		item.append(&mut self.esdt_map().get(token.money as usize).as_name().into_vec());
 
 		item.append(&mut token_owner_addr.to_address().to_vec());
 		item.push(has_secret);
@@ -1028,7 +1034,7 @@ pub trait ENonFungibleTokens
 		item.append(&mut token.miner_ratio.to_be_bytes().to_vec());
 		item.append(&mut token_miner_addr.to_address().to_vec());
 		item.append(&mut token_id.to_be_bytes().to_vec()); //Identifiant du token
-		item.append(&mut token.collection.to_be_bytes().to_vec());
+		//item.append(&mut token.collection.to_be_bytes().to_vec());
 		item.append(&mut collection.to_vec());
 		item.append(&mut description.to_vec());
 
@@ -1052,15 +1058,15 @@ pub trait ENonFungibleTokens
 		let idx_owner_filter=self.set_addresses(owner_filter);
 		let idx_dealer_filter=self.set_addresses(dealer_filter);
 
-
-		let mut i=0;
+		let mut occ=1;
 		if idx_dealer_filter==ZERO_ADDR {
 			//Ici on retourne tous les tokens
-			for token in self.tokens_map().load_as_vec() {
-				i=i+1;
-				if limit<=i {break;}
+			for i in 2..self.get_total_minted()+1 {
+				if limit<=occ {break;}
+				let token=self.tokens_map().get(i as usize);
 				if (idx_owner_filter == ZERO_ADDR || idx_owner_filter == token.owner) && (idx_miner_filter == ZERO_ADDR || idx_miner_filter == token.miner) {
-					rc.push(self.token_to_vec(token,0u32,i));
+					rc.push(self.token_to_vec(token,0u16,i));
+					occ=occ+1;
 				}
 			}
 		} else {
@@ -1068,7 +1074,7 @@ pub trait ENonFungibleTokens
 			let dealer:Dealer = self.dealers_map().get(idx_dealer);
 			for token_id in dealer.tokens.clone() {
 				let token=self.tokens_map().get(token_id as usize);
-				let markup=dealer.find_markup(token_id) as u32;
+				let markup=dealer.find_markup(token_id) as u16;
 				rc.push(self.token_to_vec(token,markup,token_id));
 			}
 		}
@@ -1089,7 +1095,7 @@ pub trait ENonFungibleTokens
 
 
 	fn get_total_minted(&self) -> u64 {
-		return self.tokens_map().len() as u64+1;
+		return self.tokens_map().len() as u64;
 	}
 
 	#[warn(deprecated)]

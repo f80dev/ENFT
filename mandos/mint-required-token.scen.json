@@ -1,0 +1,42 @@
+{
+  "name": "Mint one token ",
+  "comment": "https://github.com/ElrondNetwork/elrond-wasm-rs/blob/master/contracts/examples/lottery-esdt/mandos/buy-ticket.scen.json",
+  "gasSchedule": "dummy",
+  "steps": [
+    {
+      "step": "externalSteps",
+      "path": "mint-token.scen.json"
+    },
+    {
+      "txId": "Miner un token qui necessite un autre token",
+      "step": "scCall",
+      "tx": {
+        "from": "address:my_address",
+        "to": "sc:enonfungibletokens",
+        "function": "mint",
+        "arguments": [
+          "1",
+          "str:billet","str:billet d'acces",
+          "2",
+          "",
+          "2",
+          "0",
+          "0",
+          "0x4007",
+          "address:paul","address:paul",
+          "0",
+          "0",
+          {"esdtValue": [
+              {
+                "tokenIdentifier": "",
+                "value": "0"
+              }
+            ]}
+        ],
+        "gasLimit": "100,000,000",
+        "gasPrice": "0",
+        "value": "0"
+      }
+    }
+  ]
+}

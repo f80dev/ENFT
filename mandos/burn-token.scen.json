@@ -1,0 +1,31 @@
+{
+  "name": "Buy by direct sell one token at 2 egld",
+  "comment": "https://github.com/ElrondNetwork/elrond-wasm-rs/blob/master/contracts/examples/lottery-esdt/mandos/buy-ticket.scen.json",
+  "gasSchedule": "dummy",
+  "steps": [
+    {
+      "step": "externalSteps",
+      "path": "buy-token.scen.json"
+    },
+    {
+      "step": "scCall",
+      "txId": "burn",
+      "tx": {
+        "from": "address:sophie",
+        "to": "sc:enonfungibletokens",
+        "function": "burn",
+        "arguments": [
+          "u64:2"
+        ],
+        "gasLimit": "100,000,000",
+        "gasPrice": "0"
+      },
+      "expect": {
+        "out": [],
+        "status": "",
+        "gas": "*",
+        "refund": "*"
+      }
+    }
+  ]
+}

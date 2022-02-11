@@ -87,7 +87,7 @@ fn determine_winner_split_prize_pool_go() {
 
 #[test]
 fn lottery_init_go() {
-    elrond_wasm_debug::mandos_go("mandos/lottery-init.scen.json");
+    elrond_wasm_debug::mandos_go("mandos/lottery-enonfungibletokens-init.scen.json");
 }
 
 #[test]

@@ -129,7 +129,7 @@ fn determine_winner_split_prize_pool_rs() {
 
 #[test]
 fn lottery_init_rs() {
-    elrond_wasm_debug::mandos_rs("mandos/lottery-init.scen.json", &contract_map());
+    elrond_wasm_debug::mandos_rs("mandos/lottery-enonfungibletokens-init.scen.json", &contract_map());
 }
 
 #[test]

@@ -5,29 +5,30 @@
   "steps": [
     {
       "step": "externalSteps",
-      "path": "mint-token.scen.json"
+      "path": "buy-token.scen.json"
     },
     {
-      "txId": "buy",
       "step": "scCall",
+      "txId": "Open SmartContract",
       "tx": {
         "from": "address:sophie",
         "to": "sc:enonfungibletokens",
-        "function": "buy",
+        "function": "open",
         "arguments": [
-          "2","0x0000000000000000000000000000000000000000000000000000000000000000"
+          "u64:2","0x0"
         ],
         "gasLimit": "100,000,000",
-        "gasPrice": "0",
-        "value": "2"
+        "gasPrice": "0"
       },
       "expect": {
-        "out": ["2"],
+        "out": ["0x6d6f6e736563726574"],
         "status": "",
         "gas": "*",
         "refund": "*"
       }
     },
+
+
     {
       "step": "checkState",
       "accounts": {
@@ -43,12 +44,12 @@
         },
         "address:sophie": {
           "nonce": "*",
-          "balance": "999,998",
+          "balance": "999,999",
           "storage": {}
         },
         "sc:enonfungibletokens": {
           "nonce": "*",
-          "balance": "1",
+          "balance": "0",
           "code": "file:../output/enonfungibletokens.wasm"
         }
       }

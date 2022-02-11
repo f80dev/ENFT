@@ -1,0 +1,68 @@
+{
+  "name": "Mint voting token ",
+  "comment": "https://github.com/ElrondNetwork/elrond-wasm-rs/blob/master/contracts/examples/lottery-esdt/mandos/buy-ticket.scen.json",
+  "gasSchedule": "dummy",
+  "steps": [
+    {
+      "step": "externalSteps",
+      "path": "mint-token.scen.json"
+    },
+    {
+      "txId": "Miner un bulletin de vote",
+      "step": "scCall",
+      "tx": {
+        "from": "address:paul",
+        "to": "sc:enonfungibletokens",
+        "function": "mint",
+        "arguments": [
+          "10",
+          "str:primaires ecologistes","str:bulletin de vote",
+          "0",
+          "",
+          "1",
+          "0",
+          "0",
+          "0x4007",
+          "address:paul","address:paul",
+          "0",
+          "0",
+          {"esdtValue": [
+              {
+                "tokenIdentifier": "",
+                "value": "0"
+              }
+            ]}
+        ],
+        "gasLimit": "100,000,000",
+        "gasPrice": "0",
+        "value": "0"
+      },
+      "expect": {
+        "out": ["0x0000000000000003000000000000000400000000000000050000000000000006000000000000000700000000000000080000000000000009000000000000000a000000000000000b000000000000000c"],
+        "status": "",
+        "gas": "*",
+        "refund": "*"
+      }
+    },
+    {
+      "txId": "mettre le token en vente",
+      "step": "scCall",
+      "tx": {
+        "from": "address:paul",
+        "to": "sc:enonfungibletokens",
+        "function": "setstate",
+        "arguments": [
+          ["u64:3","u64:4","u64:5"],"1"
+        ],
+        "gasLimit": "100,000,000",
+        "gasPrice": "0"
+      },
+      "expect": {
+        "out": ["0"],
+        "status": "",
+        "gas": "*",
+        "refund": "*"
+      }
+    }
+  ]
+}

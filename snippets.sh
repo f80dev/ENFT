@@ -50,8 +50,11 @@ deploy() {
     clear
     echo "Build avec l'adresse : ${BANK}"
     build
-
     clear
+
+    echo "test"
+    erdpy contract test
+
     echo "Déploiement"
     #erdpy --verbose contract deploy --chain=${CHAINID} --bytecode=${BYTECODE} --metadata-payable --proxy=${PROXY} --recall-nonce --pem=${ALICE} --gas-limit=150000000 --outfile="deploy.json" --send
     erdpy --verbose contract deploy --chain=${CHAINID} --project=${PROJECT} --metadata-payable --proxy=${PROXY} --recall-nonce --pem=${BANK} --gas-limit=180000000 --outfile="deploy.json" --send
