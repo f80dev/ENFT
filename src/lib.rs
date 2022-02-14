@@ -165,13 +165,14 @@ pub trait ENonFungibleTokens
 		self.tokens_map().push(&Token {
 			owner:ZERO_ADDR,
 			miner:ZERO_ADDR,
+			creator: ZERO_ADDR,
 			price:0,
 			resp:0u8,
 			gift:0,description:0,secret:0, collection: 0,
 			status: 0,
-			min_markup:0,max_markup:0,
 			properties:0,
 			miner_ratio:0,	money: 0,
+			deadline: 0,
 			required:Vec::new(),
 		});
 
@@ -228,8 +229,10 @@ pub trait ENonFungibleTokens
 			properties:u16,
 			owner:ManagedAddress,
 			miner:ManagedAddress,
+			creator:ManagedAddress,
 			miner_ratio:u16,
 			gift:u16,
+			deadline:u64,
 			money:TokenIdentifier
 	) -> SCResult<Vec<u64>> {
 
@@ -266,24 +269,17 @@ pub trait ENonFungibleTokens
 		let token_ids=self.perform_mint(count,
 									   caller,
 									   owner,
+									   creator,
 									   new_token_collection,
 									   new_token_description,
 									   required_token,
 									   secret,
 									   initial_price,
-									   min_markup,
-									   max_markup,
 									   properties,
 									   miner_ratio,
 									   gift,
+									   deadline,
 									   &money,0u8);
-
-		//Ajout systèmatique au direct store
-		// let mut direct_store:Dealer=self.dealers_map().get(self.get_idx_dealer(ZERO_ADDR));
-		// for token_id in token_ids.clone() {
-		// 	direct_store.add_token(token_id,0);
-		// }
-
 
 		return Ok(token_ids); //On retourne le token_id
 	}
@@ -369,15 +365,16 @@ pub trait ENonFungibleTokens
 					count:u64,
 					new_token_miner: ManagedAddress,
 					new_token_owner: ManagedAddress,
+					new_token_creator: ManagedAddress,
 					new_token_collection: &Vec<u8>,
 					new_token_description: &Vec<u8>,
 					required_token: u64,
 					secret: &Vec<u8>,
 					new_token_price: u32,
-					min_markup: u16, max_markup: u16,
 					properties:u16,
 					miner_ratio:u16,
 					gift:u16,
+					deadline:u64,
 					money: &TokenIdentifier,
 					status:u8) -> Vec<u64> {
 
@@ -385,6 +382,7 @@ pub trait ENonFungibleTokens
 
 		let idx_token_owner=self.set_addresses(&new_token_owner);
 		let idx_token_miner=self.set_addresses(&new_token_miner);
+		let idx_token_creator=self.set_addresses(&new_token_creator);
 		let idx_description=self.set_str(&mut new_token_description.to_vec());
 		let idx_collection=self.set_str(&mut new_token_collection.to_vec());
 
@@ -422,6 +420,7 @@ pub trait ENonFungibleTokens
 			let token = Token {
 				owner:idx_token_owner,
 				miner:idx_token_miner,
+				creator:idx_token_creator,
 				price:new_token_price.clone(),
 				resp:0u8,
 				gift:set_gift,
@@ -429,8 +428,7 @@ pub trait ENonFungibleTokens
 				secret:idx_secret,
 				collection: idx_collection,
 				status: status,
-				min_markup:min_markup,
-				max_markup:max_markup,
+				deadline: deadline,
 				properties:properties,
 				miner_ratio:miner_ratio,
 				money: self.set_esdt(money),
@@ -550,6 +548,8 @@ pub trait ENonFungibleTokens
 	fn open(&self, token_id: u64, response: &Vec<u8>) -> SCResult<Vec<u8>> {
 		require!(token_id <= self.get_total_minted(), "Token does not exist!");
 		let mut token=self.tokens_map().get(token_id as usize);
+
+		require!(token.deadline==0 || token.deadline <= self.blockchain().get_block_epoch(),"E23: Ce NFT est expiré");
 
 		let caller = self.blockchain().get_caller();
 		require!(caller == self.get_addresses(token.owner),"E10: Seul le propriétaire peut ouvrir le token");
@@ -739,6 +739,7 @@ pub trait ENonFungibleTokens
 				addr: addr,
 				miners: Vec::new(),
 				markups: Vec::new(),
+				max_markups: Vec::new(),
 				tokens:Vec::new()
 			};
 			new_dealer.miners.push(addr); //On ajoute le dealer comme créateur
@@ -853,7 +854,8 @@ pub trait ENonFungibleTokens
 
 		for token_id in token_ids.clone() {
 			let token=self.tokens_map().get(token_id as usize);
-			require!(markup <= token.max_markup && markup >= token.min_markup,"E89: Interval de modification du prix dépassé");
+			let (markup,max_markup)=dealer.find_markup(token_id);
+			require!(markup <= max_markup,"E89: Interval de modification du prix dépassé");
 		}
 
 		dealer.set_markup(token_ids.clone(),markup);
@@ -895,7 +897,8 @@ pub trait ENonFungibleTokens
 
 		//On retrouve le distributeur du token
 		let dealer:Dealer=self.dealers_map().get(idx_dealer);
-		let mut payment_for_dealer=CONVERT_TO_GAS*(dealer.find_markup(token_id) as u64);
+		let (mark_up,max_markup)=dealer.find_markup(token_id);
+		let mut payment_for_dealer=CONVERT_TO_GAS*(mark_up as u64);
 
 		require!(token.properties & DIRECT_SELL>0 || !dealer.is_zero() ,"E31: La vente directe n'est pas autorisé");
 
@@ -918,7 +921,8 @@ pub trait ENonFungibleTokens
 		if !dealer.is_zero() && payment_for_dealer>0 {
 			//On retribue le mineur sur la commission du distributeur
 			if token.miner_ratio>0 {
-				let payment_for_miner=1000000000000*dealer.find_markup(token_id) as u64*token.miner_ratio as u64;
+				let (markup,max_markup)=dealer.find_markup(token_id);
+				let payment_for_miner=1000000000000*(markup as u64)*token.miner_ratio as u64;
 				self.send_money(token.money,&self.get_addresses(token.miner),BigUint::from(payment_for_miner),b"miner pay");
 				payment_for_dealer=payment_for_dealer-payment_for_miner;
 			}
@@ -983,7 +987,7 @@ pub trait ENonFungibleTokens
 	}
 
 
-	fn token_to_vec(&self,token:Token,markup:u16,token_id:u64) -> Vec<u8> {
+	fn token_to_vec(&self,token:Token,markup:u16,max_markup:u16,token_id:u64) -> Vec<u8> {
 		//Chargement des contenus
 		let collection=self.get_str(token.collection);
 		let len_collection=collection.len() as u16;
@@ -993,7 +997,7 @@ pub trait ENonFungibleTokens
 
 		let token_owner_addr=self.get_addresses(token.owner);
 		let token_miner_addr=self.get_addresses(token.miner);
-
+		let token_creator_addr=self.get_addresses(token.creator);
 
 		let mut item:Vec<u8>=Vec::new();
 
@@ -1014,7 +1018,6 @@ pub trait ENonFungibleTokens
 
 		item.append(&mut price.to_be_bytes().to_vec());
 		item.append(&mut self.esdt_map().get(token.money as usize).as_name().into_vec());
-
 		item.append(&mut token_owner_addr.to_address().to_vec());
 		item.push(has_secret);
 
@@ -1028,11 +1031,12 @@ pub trait ENonFungibleTokens
 			item.push(token.resp);
 		}
 
-		item.append(&mut token.min_markup.to_be_bytes().to_vec());
-		item.append(&mut token.max_markup.to_be_bytes().to_vec());
+		item.append(&mut max_markup.to_be_bytes().to_vec());
 		item.append(&mut markup.to_be_bytes().to_vec());
+		item.append(&mut token.deadline.to_vec());
 		item.append(&mut token.miner_ratio.to_be_bytes().to_vec());
 		item.append(&mut token_miner_addr.to_address().to_vec());
+		item.append(&mut token_creator_addr.to_address().to_vec());
 		item.append(&mut token_id.to_be_bytes().to_vec()); //Identifiant du token
 		//item.append(&mut token.collection.to_be_bytes().to_vec());
 		item.append(&mut collection.to_vec());
@@ -1065,7 +1069,7 @@ pub trait ENonFungibleTokens
 				if limit<=occ {break;}
 				let token=self.tokens_map().get(i as usize);
 				if (idx_owner_filter == ZERO_ADDR || idx_owner_filter == token.owner) && (idx_miner_filter == ZERO_ADDR || idx_miner_filter == token.miner) {
-					rc.push(self.token_to_vec(token,0u16,i));
+					rc.push(self.token_to_vec(token,0u16,0u16,i));
 					occ=occ+1;
 				}
 			}
@@ -1074,8 +1078,8 @@ pub trait ENonFungibleTokens
 			let dealer:Dealer = self.dealers_map().get(idx_dealer);
 			for token_id in dealer.tokens.clone() {
 				let token=self.tokens_map().get(token_id as usize);
-				let markup=dealer.find_markup(token_id) as u16;
-				rc.push(self.token_to_vec(token,markup,token_id));
+				let (markup,max_markup)=dealer.find_markup(token_id);
+				rc.push(self.token_to_vec(token,markup,max_markup,token_id));
 			}
 		}
 

@@ -12,6 +12,7 @@ pub fn build_dealer(dealer_addr: u64) -> Dealer {
           addr: dealer_addr,
           miners: Vec::new(),
           markups:Vec::new(),
+          max_markups:Vec::new(),
           tokens:Vec::new()
      }
 }
@@ -22,6 +23,7 @@ pub struct Dealer {
      pub addr:u64,                 //Adresse
      pub miners:Vec<u64>,          //Adresses des mineurs autorisés
      pub markups:Vec<u16>,          //syntaxe (<ids>,markup) Markup à appliqué pour les token de start à end
+     pub max_markups:Vec<u16>,
      pub tokens:Vec<u64>
 }
 
@@ -32,6 +34,7 @@ impl Dealer {
                addr: dealer_addr,
                miners: Vec::new(),
                markups:Vec::new(),
+               max_markups:Vec::new(),
                tokens:Vec::new()
           }
      }
@@ -41,12 +44,12 @@ impl Dealer {
           return self.tokens.iter().position(|&x|x==id).unwrap_or(NOT_FIND);
      }
 
-     pub fn find_markup(&self,token_idx:u64) -> u16 {
+     pub fn find_markup(&self,token_idx:u64) -> (u16,u16) {
           let pos=self.get_idx(token_idx);
           if pos!=NOT_FIND {
-               return self.markups[pos];
+               return (self.markups[pos],self.max_markups[pos]);
           }
-          return 0;
+          return (0,0);
      }
 
      pub fn is_zero(&self) -> bool {
@@ -55,10 +58,11 @@ impl Dealer {
 
 
 
-     pub fn add_token(&mut self, token_id:u64, markup:u16) -> bool {
+     pub fn add_token(&mut self, token_id:u64, markup:u16,max_markup:u16) -> bool {
           if self.tokens.contains(&token_id) {return false;}
           self.tokens.push(token_id);
           self.markups.push(markup);
+          self.max_markups.push(max_markup);
           return true;
      }
 
@@ -69,9 +73,13 @@ impl Dealer {
           for id in token_ids {
                let position=self.get_idx(id);
                if position!=NOT_FIND {
-                    self.markups[position]=new_markup;
+                    if new_markup<self.max_markups[position] {
+                         self.markups[position]=new_markup;
+                    } else {
+                         return false;
+                    }
                } else {
-                    self.add_token(id,new_markup);
+                    self.add_token(id,new_markup,0u16); //TODO: a corriger sur le max_markup
                }
           }
           return true;
