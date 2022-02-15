@@ -1,5 +1,5 @@
 {
-  "name": "Mint one token with limit",
+  "name": "Mint deadline token",
   "comment": "https://github.com/ElrondNetwork/elrond-wasm-rs/blob/master/contracts/examples/lottery-esdt/mandos/buy-ticket.scen.json",
   "gasSchedule": "dummy",
   "steps": [
@@ -8,40 +8,7 @@
       "path": "enonfungibletokens-init.scen.json"
     },
     {
-      "txId": "mint by my_address with Paul as owner",
-      "step": "scCall",
-      "tx": {
-        "from": "address:my_address",
-        "to": "sc:enonfungibletokens",
-        "function": "mint",
-        "arguments": [
-          "1",
-          "str:collection","str:description",
-          "0",
-          "str:monsecret",
-          "2",
-          "0",
-          "0",
-          "0x4007",
-          "address:paul","address:paul",
-          "0",
-          "0",
-          "1",
-          "0",
-          {"esdtValue": [
-              {
-                "tokenIdentifier": "",
-                "value": "0"
-              }
-            ]}
-        ],
-        "gasLimit": "100,000,000",
-        "gasPrice": "0",
-        "value": "2"
-      }
-    },
-    {
-      "txId": "mint by Paul with Paul as owner",
+      "txId": "mint by paul with Paul as owner with 1 delay",
       "step": "scCall",
       "tx": {
         "from": "address:paul",
@@ -52,13 +19,46 @@
           "str:collection","str:description",
           "0",
           "str:monsecret",
-          "2",
+          "1",
           "0",
           "0x4007",
           "address:paul","address:paul","address:paul",
           "0",
+          "0",
+          "0",
+          "0",
+          {"esdtValue": [
+              {
+                "tokenIdentifier": "",
+                "value": "0"
+              }
+            ]
+          }
+        ],
+        "gasLimit": "100,000,000",
+        "gasPrice": "0",
+        "value": "0"
+      }
+    },
+    {
+      "txId": "mint by paul with Paul as owner with 20000 delay",
+      "step": "scCall",
+      "tx": {
+        "from": "address:paul",
+        "to": "sc:enonfungibletokens",
+        "function": "mint",
+        "arguments": [
+          "1",
+          "str:collection","str:description",
+          "0",
+          "str:monsecret",
           "1",
           "0",
+          "0x4007",
+          "address:paul","address:paul","address:paul",
+          "0",
+          "0",
+          "20000",
           "0",
           {"esdtValue": [
             {
@@ -69,33 +69,7 @@
         ],
         "gasLimit": "100,000,000",
         "gasPrice": "0",
-        "value": "1"
-      },
-      "expect": {
-        "out": ["0x0000000000000002"],
-        "status": "0",
-        "gas": "*",
-        "refund": "*"
-      }
-    },
-    {
-      "txId": "setstate pour mettre le token en vente",
-      "step": "scCall",
-      "tx": {
-        "from": "address:paul",
-        "to": "sc:enonfungibletokens",
-        "function": "setstate",
-        "arguments": [
-          ["u64:2"],"1"
-        ],
-        "gasLimit": "100,000,000",
-        "gasPrice": "0"
-      },
-      "expect": {
-        "out": ["0"],
-        "status": "",
-        "gas": "*",
-        "refund": "*"
+        "value": "0"
       }
     },
     {
@@ -107,8 +81,8 @@
           "storage": {}
         },
         "address:paul": {
-          "nonce": "*",
-          "balance": "999,999",
+          "nonce": "2",
+          "balance": "1000000",
           "storage": {}
         },
         "address:sophie": {
@@ -118,7 +92,7 @@
         },
         "sc:enonfungibletokens": {
           "nonce": "0",
-          "balance": "1",
+          "balance": "0",
           "code": "file:../output/enonfungibletokens.wasm"
         }
       }

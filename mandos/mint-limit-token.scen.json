@@ -15,19 +15,18 @@
         "to": "sc:enonfungibletokens",
         "function": "mint",
         "arguments": [
-          "1",
+          "5",
           "str:collection","str:description",
           "0",
           "str:monsecret",
           "2",
           "0",
-          "0",
           "0x4007",
-          "address:paul","address:paul",
-          "0",
+          "address:paul","address:paul","address:paul",
           "0",
           "1",
           "0",
+          "1",
           {"esdtValue": [
               {
                 "tokenIdentifier": "",
@@ -48,18 +47,18 @@
         "to": "sc:enonfungibletokens",
         "function": "mint",
         "arguments": [
-          "1",
+          "10",
           "str:collection","str:description",
           "0",
           "str:monsecret",
-          "2",
+          "1",
           "0",
           "0x4007",
           "address:paul","address:paul","address:paul",
           "0",
+          "0",
+          "0",
           "1",
-          "0",
-          "0",
           {"esdtValue": [
             {
               "tokenIdentifier": "",
@@ -69,10 +68,10 @@
         ],
         "gasLimit": "100,000,000",
         "gasPrice": "0",
-        "value": "1"
+        "value": "0"
       },
       "expect": {
-        "out": ["0x0000000000000002"],
+        "out": ["0x00000000000000020000000000000003000000000000000400000000000000050000000000000006000000000000000700000000000000080000000000000009000000000000000a000000000000000b"],
         "status": "0",
         "gas": "*",
         "refund": "*"
@@ -108,7 +107,7 @@
         },
         "address:paul": {
           "nonce": "*",
-          "balance": "999,999",
+          "balance": "1000000",
           "storage": {}
         },
         "address:sophie": {
@@ -118,7 +117,7 @@
         },
         "sc:enonfungibletokens": {
           "nonce": "0",
-          "balance": "1",
+          "balance": "0",
           "code": "file:../output/enonfungibletokens.wasm"
         }
       }

@@ -1,6 +1,7 @@
 use elrond_wasm::{
      types::{Vec},
 };
+use crate::ZERO_ADDR;
 
 elrond_wasm::derive_imports!();
 
@@ -23,12 +24,23 @@ pub struct Token {
      pub miner_ratio:u16,
 
      pub money:u16,                      //Reférence à une money
+     pub limit:u8,                       //Nombre maximum de token par owner de la meme collection
      pub status:u8,                      //status sur l'état du token
      pub deadline:u64,                   //Date limite d'ouverture du token et voir la commande self.bloackc
 
      pub required:Vec<u64>              //L'achat de ce token necessite la possession des tokens suivants
 
 }
+
+impl Token {
+     pub fn is_burn(&self,now:u64) -> bool {
+          if self.owner!=ZERO_ADDR && self.deadline>now {
+               return false;
+          }
+          return true;
+     }
+}
+
 
 
 
