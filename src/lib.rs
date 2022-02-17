@@ -7,6 +7,7 @@
 elrond_wasm::imports!();
 use token::Token;
 use dealer::Dealer;
+use elrond_wasm::abi::TypeContents::NotSpecified;
 
 mod token;
 mod dealer;
@@ -99,8 +100,12 @@ pub trait ENonFungibleTokens
 	//Retrouve l'index d'un dealer dans la liste des dealers
 	#[view(get_idx_dealer)]
 	fn get_idx_dealer(&self,idx_dealer_addr: u64) -> usize {
-		let idx= self.dealers_map().load_as_vec().iter().position(|r:&Dealer| r.addr==idx_dealer_addr).unwrap_or(NOT_FIND);
-		return idx+1;
+		let idx= self.dealers_map().load_as_vec().iter().position(|r| r.addr==idx_dealer_addr).unwrap_or(NOT_FIND);
+		if idx==NOT_FIND {
+			return idx
+		} else {
+			return idx+1;
+		}
 	}
 
 	//Gestion des chaines de caractères
@@ -433,7 +438,7 @@ pub trait ENonFungibleTokens
 				secret:idx_secret,
 				collection: idx_collection,
 				status: status,
-				deadline: deadline+self.blockchain().get_block_timestamp(),
+				deadline: (if deadline==0 {u64::MAX} else {deadline+self.blockchain().get_block_timestamp()}),
 				properties:properties,
 				limit:limit,
 				miner_ratio:miner_ratio,
@@ -616,7 +621,7 @@ pub trait ENonFungibleTokens
 	//Permet d'ajouter un distributeur à la liste des distributeurs du token
 	//Cette fonction est réservé au propriétaire du token
 	#[endpoint(add_dealer)]
-	fn add_dealer(&self,  token_ids: Vec<u64>, addr: &ManagedAddress, markup:u16) -> SCResult<()> {
+	fn add_dealer(&self,  token_ids: Vec<u64>, addr: &ManagedAddress, markup:u16,max_markup:u16) -> SCResult<()> {
 		let owner_idx_addr=self.set_addresses(&self.blockchain().get_caller());
 
 		let dealer_idx = self.get_idx_dealer(self.get_idx_addresses(addr));
@@ -629,14 +634,11 @@ pub trait ENonFungibleTokens
 			require!(token.owner == owner_idx_addr,"E21: Only token owner can add dealer");
 		}
 
-		dealer.set_markup(token_ids.clone(),markup);
-
-
-		//self.dealers_map().set(dealer_idx,&dealer);
+		if dealer.set_markup(token_ids.clone(),markup,max_markup) {
+			self.dealers_map().set(dealer_idx,&dealer);
+		}
 
 		return Ok(());
-
-		//sc_error!("le miner du token n'est pas autorisé par le dealer")
 	}
 
 
@@ -694,7 +696,7 @@ pub trait ENonFungibleTokens
 
 	//Ajouter un miner approuvé à un dealer
 	#[endpoint(add_miner)]
-	fn add_miner(&self,  miner_addr: &ManagedAddress) -> SCResult<()> {
+	fn add_miner(&self,  miner_addr: &ManagedAddress) -> SCResult<(usize)> {
 		let idx_dealer=self.get_idx_dealer(self.set_addresses(&self.blockchain().get_caller()));
 		require!(idx_dealer != NOT_FIND, "E55:Dealer not listed");
 
@@ -702,7 +704,7 @@ pub trait ENonFungibleTokens
 		dealer.miners.push(self.set_addresses(&miner_addr));
 		self.dealers_map().set(idx_dealer,&dealer);
 
-		return Ok(());
+		return Ok((dealer.miners.len()));
 	}
 
 
@@ -860,13 +862,15 @@ pub trait ENonFungibleTokens
 		let dealer_idx = self.get_idx_dealer(self.get_idx_addresses(&self.blockchain().get_caller()));
 		let mut dealer:Dealer=self.dealers_map().get(dealer_idx);
 
+		let mut markup=0u16;
+		let mut max_markup=0u16;
 		for token_id in token_ids.clone() {
 			let token=self.tokens_map().get(token_id as usize);
-			let (markup,max_markup)=dealer.find_markup(token_id);
+			(markup,max_markup)=dealer.find_markup(token_id);
 			require!(markup <= max_markup,"E89: Interval de modification du prix dépassé");
 		}
 
-		dealer.set_markup(token_ids.clone(),markup);
+		dealer.set_markup(token_ids.clone(),markup,u16::MAX); //TODO: A revoir
 
 		return Ok(());
 	}
@@ -943,7 +947,7 @@ pub trait ENonFungibleTokens
 		if !dealer.is_zero() && payment_for_dealer>0 {
 			//On retribue le mineur sur la commission du distributeur
 			if token.miner_ratio>0 {
-				let (markup,max_markup)=dealer.find_markup(token_id);
+				let (markup,_max_markup)=dealer.find_markup(token_id);
 				let payment_for_miner=1000000000000*(markup as u64)*token.miner_ratio as u64;
 				self.send_money(token.money,&self.get_addresses(token.miner),BigUint::from(payment_for_miner),b"miner pay");
 				payment_for_dealer=payment_for_dealer-payment_for_miner;
@@ -1101,12 +1105,14 @@ pub trait ENonFungibleTokens
 			}
 		} else {
 			let idx_dealer=self.get_idx_dealer(idx_dealer_filter);
-			let dealer:Dealer = self.dealers_map().get(idx_dealer);
-			for token_id in dealer.tokens.clone() {
-				let token:Token=self.tokens_map().get(token_id as usize);
-				let (markup,max_markup)=dealer.find_markup(token_id);
-				if !token.is_burn(now) {
-					rc.push(self.token_to_vec(token,markup,max_markup,token_id));
+			if idx_dealer!=NOT_FIND {
+				let dealer:Dealer = self.dealers_map().get(idx_dealer);
+				for token_id in dealer.tokens.clone() {
+					let token:Token=self.tokens_map().get(token_id as usize);
+					let (markup,max_markup)=dealer.find_markup(token_id);
+					if !token.is_burn(now) {
+						rc.push(self.token_to_vec(token,markup,max_markup,token_id));
+					}
 				}
 			}
 		}

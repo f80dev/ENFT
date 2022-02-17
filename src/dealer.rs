@@ -69,7 +69,7 @@ impl Dealer {
 
 
 
-     pub fn set_markup(&mut self,token_ids:Vec<u64>,new_markup:u16) -> bool {
+     pub fn set_markup(&mut self,token_ids:Vec<u64>,new_markup:u16,max_markup:u16) -> bool {
           for id in token_ids {
                let position=self.get_idx(id);
                if position!=NOT_FIND {
@@ -79,7 +79,7 @@ impl Dealer {
                          return false;
                     }
                } else {
-                    self.add_token(id,new_markup,0u16); //TODO: a corriger sur le max_markup
+                    self.add_token(id,new_markup,max_markup); //TODO: a corriger sur le max_markup
                }
           }
           return true;

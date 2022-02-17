@@ -1,16 +1,56 @@
 {
-  "name": "Roger become dealer",
+  "name": "Sophie become dealer",
   "gasSchedule": "dummy",
   "steps": [
     {
       "step": "externalSteps",
-      "path": "enonfungibletokens-init.scen.json"
+      "path": "mint-token.scen.json"
     },
     {
+      "txId": "get_id addr of sophie",
       "step": "scCall",
-      "txId": "new_dealer",
       "tx": {
-        "from": "address:my_address",
+        "from": "address:sophie",
+        "to": "sc:enonfungibletokens",
+        "function": "set_addresses",
+        "arguments": [
+          "address:sophie"
+        ],
+        "gasLimit": "100,000,000",
+        "gasPrice": "0"
+      },
+      "expect": {
+        "out": ["3"],
+        "status": "",
+        "gas": "*",
+        "refund": "*"
+      }
+    },
+    {
+      "txId": "get_idx_dealer avant ajout",
+      "step": "scCall",
+      "tx": {
+        "from": "address:sophie",
+        "to": "sc:enonfungibletokens",
+        "function": "get_idx_dealer",
+        "arguments": [
+          "3"
+        ],
+        "gasLimit": "100,000,000",
+        "gasPrice": "0"
+      },
+      "expect": {
+        "out": ["0xffffffff"],
+        "status": "",
+        "gas": "*",
+        "refund": "*"
+      }
+    },
+    {
+      "txId": "new_dealer",
+      "step": "scCall",
+      "tx": {
+        "from": "address:sophie",
         "to": "sc:enonfungibletokens",
         "function": "new_dealer",
         "arguments": [],
@@ -18,7 +58,116 @@
         "gasPrice": "0"
       },
       "expect": {
-        "out": ["1"],
+        "out": ["2"],
+        "status": "",
+        "gas": "*",
+        "refund": "*"
+      }
+    },
+    {
+      "txId": "get_idx_dealer après ajout",
+      "step": "scCall",
+      "tx": {
+        "from": "address:sophie",
+        "to": "sc:enonfungibletokens",
+        "function": "get_idx_dealer",
+        "arguments": [
+          "3"
+        ],
+        "gasLimit": "100,000,000",
+        "gasPrice": "0"
+      },
+      "expect": {
+        "out": ["2"],
+        "status": "",
+        "gas": "*",
+        "refund": "*"
+      }
+    },
+    {
+      "txId": "add_miner to dealer",
+      "step": "scCall",
+      "tx": {
+        "from": "address:sophie",
+        "to": "sc:enonfungibletokens",
+        "function": "add_miner",
+        "arguments": [
+          "address:paul"
+        ],
+        "gasLimit": "100,000,000",
+        "gasPrice": "0"
+      },
+      "expect": {
+        "out": ["2"],
+        "status": "",
+        "gas": "*",
+        "refund": "*"
+      }
+    },
+
+    {
+      "txId": "add sophie as dealer to token",
+      "step": "scCall",
+      "tx": {
+        "from": "address:paul",
+        "to": "sc:enonfungibletokens",
+        "function": "add_dealer",
+        "arguments": [
+          ["u64:2"],
+          "address:sophie",
+          "1","1"
+        ],
+        "gasLimit": "100,000,000",
+        "gasPrice": "0"
+      },
+      "expect": {
+        "out": [],
+        "status": "",
+        "gas": "*",
+        "refund": "*"
+      }
+    },
+    {
+      "txId": "view tokens owned by paul",
+      "step": "scCall",
+      "tx": {
+        "from": "address:my_address",
+        "to": "sc:enonfungibletokens",
+        "function": "tokens",
+        "arguments": [
+          "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "address:paul",
+          "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "100"
+        ],
+        "gasLimit": "100,000,000",
+        "gasPrice": "0"
+      },
+      "expect": {
+        "out": ["0x000000a0000a000b000000040000000245474c447061756c5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f014007000000000000ffffffffffffffff00007061756c5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f7061756c5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f0000000000000002636f6c6c656374696f6e6465736372697074696f6e"],
+        "status": "",
+        "gas": "*",
+        "refund": "*"
+      }
+    },
+    {
+      "txId": "view tokens distributed by sophie",
+      "step": "scCall",
+      "tx": {
+        "from": "address:sophie",
+        "to": "sc:enonfungibletokens",
+        "function": "tokens",
+        "arguments": [
+          "address:sophie",
+          "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "100"
+        ],
+        "gasLimit": "100,000,000",
+        "gasPrice": "0"
+      },
+      "expect": {
+        "out": ["0x000000a0000a000b000000040000006645474c447061756c5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f014007000000000001ffffffffffffffff00007061756c5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f7061756c5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f0000000000000002636f6c6c656374696f6e6465736372697074696f6e"],
         "status": "",
         "gas": "*",
         "refund": "*"
