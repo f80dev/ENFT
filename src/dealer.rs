@@ -6,16 +6,16 @@ use crate::{NOT_FIND, ZERO_ADDR};
 
 elrond_wasm::derive_imports!();
 
-pub fn build_dealer(dealer_addr: u64) -> Dealer {
-     return Dealer {
-          state: 0,
-          addr: dealer_addr,
-          miners: Vec::new(),
-          markups:Vec::new(),
-          max_markups:Vec::new(),
-          tokens:Vec::new()
-     }
-}
+// pub fn build_dealer(dealer_addr: u64) -> Dealer {
+//      return Dealer {
+//           state: 0,
+//           addr: dealer_addr,
+//           miners: Vec::new(),
+//           markups:Vec::new(),
+//           max_markups:Vec::new(),
+//           tokens:Vec::new()
+//      }
+// }
 
 #[derive(NestedEncode, NestedDecode, TopEncode, TopDecode, TypeAbi)]
 pub struct Dealer {

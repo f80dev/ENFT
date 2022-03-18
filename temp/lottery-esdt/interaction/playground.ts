@@ -14,7 +14,7 @@ async function main() {
     let signer = BackendSigner.fromWalletKey(keyFileObject, password);
     let user = new Account(signer.getAddress());
 
-    let abiPath = path.resolve(__dirname, "abi.json");
+    let abiPath = path.resolve(__dirname, "meta.json");
     let abiJson = fs.readFileSync(abiPath, { encoding: "utf8" });
     let abiObject = JSON.parse(abiJson);
     let abi = new AbiRegistry();

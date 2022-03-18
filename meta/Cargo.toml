@@ -1,5 +1,5 @@
 [package]
-name = "enonfungibletokens-abi"
+name = "enonfungibletokens-meta"
 version = "0.0.0"
 authors = ["andrei-marinica <andrei.marinica@elrond.com>"]
 edition = "2018"
@@ -8,8 +8,5 @@ publish = false
 [dependencies.enonfungibletokens]
 path = ".."
 
-[dependencies.elrond-wasm]
-version = "0.21.2"
-
 [dependencies.elrond-wasm-debug]
-version = "0.21.2"
+version = "0.30.0"

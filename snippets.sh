@@ -3,8 +3,8 @@
 
 #Compilation et déploiement du smartcontrat (la cible testnet, devnet étant déterminée ci-dessous)
 #sed 's/\r$//' snippets.sh
-#cd /home/root/dev && pip install erdpy==1.0.25 && source snippets.sh && deploy
-#cd /home/root/dev && pip install erdpy==1.0.25 && erdpy contract build && erdpy contract test
+#cd /home/root/dev && source snippets.sh && deploy
+#cd /home/root/dev && pip install erdpy==1.2.3 && erdpy contract build --no-wasm-opt && erdpy contract test
 #tests : erdpy contract test --wildcard buy-for-limit*.*
 #clear && erdpy contract build && erdpy contract test
 #clear && source snippets.sh && deploy
@@ -47,9 +47,13 @@ CHAINID="D"
 #CHAINID="local-testnet"
 
 
+build(){
+  clear
+  echo "Build avec l'adresse : ${BANK}"
+  erdpy contract build --no-wasm-opt --wasm-name ./output/output.wasm
+}
+
 deploy() {
-    clear
-    echo "Build avec l'adresse : ${BANK}"
     build
     clear
 
@@ -57,8 +61,9 @@ deploy() {
     erdpy contract test
 
     echo "Déploiement"
-    #erdpy --verbose contract deploy --chain=${CHAINID} --bytecode=${BYTECODE} --metadata-payable --proxy=${PROXY} --recall-nonce --pem=${ALICE} --gas-limit=150000000 --outfile="deploy.json" --send
-    erdpy --verbose contract deploy --chain=${CHAINID} --project=${PROJECT} --metadata-payable --proxy=${PROXY} --recall-nonce --pem=${BANK} --gas-limit=180000000 --outfile="deploy.json" --send
+    erdpy --verbose contract deploy --chain=${CHAINID} --project=${PROJECT} \
+          --proxy=${PROXY} --recall-nonce --pem=${BANK} --gas-limit="80000000" \
+          --outfile="deploy.json" --send || return
 
     TRANSACTION=$(erdpy data parse --file="deploy.json" --expression="data['emitted_tx']['hash']")
     ADDRESS=$(erdpy data parse --file="deploy.json" --expression="data['emitted_tx']['address']")

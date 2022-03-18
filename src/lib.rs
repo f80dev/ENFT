@@ -7,7 +7,6 @@
 elrond_wasm::imports!();
 use token::Token;
 use dealer::Dealer;
-use elrond_wasm::abi::TypeContents::NotSpecified;
 
 mod token;
 mod dealer;
@@ -233,7 +232,6 @@ pub trait ENonFungibleTokens
 			required_token:u64,
 			secret: &Vec<u8>,
 			initial_price: u32,
-			max_markup:u16,
 			properties:u16,
 			owner:ManagedAddress,
 			miner:ManagedAddress,
@@ -646,7 +644,7 @@ pub trait ENonFungibleTokens
 	//Seul le propriétaire du token peut le remettre en vente
 	//tag set_state
 	#[endpoint(setstate)]
-	fn setstate(&self,  token_ids: Vec<u64>,new_state:u8) -> SCResult<(u64)> {
+	fn setstate(&self,  token_ids: Vec<u64>,new_state:u8) -> SCResult<u64> {
 
 		let mut rc=0;
 		let caller_addr=self.set_addresses(&self.blockchain().get_caller());
@@ -674,7 +672,7 @@ pub trait ENonFungibleTokens
 
 		}
 
-		return Ok((rc));
+		return Ok(rc);
 	}
 
 
@@ -696,7 +694,7 @@ pub trait ENonFungibleTokens
 
 	//Ajouter un miner approuvé à un dealer
 	#[endpoint(add_miner)]
-	fn add_miner(&self,  miner_addr: &ManagedAddress) -> SCResult<(usize)> {
+	fn add_miner(&self,  miner_addr: &ManagedAddress) -> SCResult<usize> {
 		let idx_dealer=self.get_idx_dealer(self.set_addresses(&self.blockchain().get_caller()));
 		require!(idx_dealer != NOT_FIND, "E55:Dealer not listed");
 
@@ -704,7 +702,7 @@ pub trait ENonFungibleTokens
 		dealer.miners.push(self.set_addresses(&miner_addr));
 		self.dealers_map().set(idx_dealer,&dealer);
 
-		return Ok((dealer.miners.len()));
+		return Ok(dealer.miners.len());
 	}
 
 
@@ -857,7 +855,7 @@ pub trait ENonFungibleTokens
 	//Modifier le prix (dans la fourchette initialement défini par le mineur du token)
 	//Seul les distributeurs peuvent modifier le prix
 	#[endpoint]
-	fn price(&self, token_ids: Vec<u64>, markup: u16) -> SCResult<()> {
+	fn price(&self, token_ids: Vec<u64>, _markup: u16) -> SCResult<()> {
 
 		let dealer_idx = self.get_idx_dealer(self.get_idx_addresses(&self.blockchain().get_caller()));
 		let mut dealer:Dealer=self.dealers_map().get(dealer_idx);
@@ -865,7 +863,6 @@ pub trait ENonFungibleTokens
 		let mut markup=0u16;
 		let mut max_markup=0u16;
 		for token_id in token_ids.clone() {
-			let token=self.tokens_map().get(token_id as usize);
 			(markup,max_markup)=dealer.find_markup(token_id);
 			require!(markup <= max_markup,"E89: Interval de modification du prix dépassé");
 		}
@@ -898,7 +895,7 @@ pub trait ENonFungibleTokens
 	//Voir l'exemple de la fonction fund dans https://github.com/ElrondNetwork/elrond-wasm-rs/blob/master/contracts/examples/crowdfunding-esdt/src/crowdfunding_esdt.rs
 	#[payable("EGLD")]
 	#[endpoint]
-	fn buy(&self, token_id: u64,dealer_addr:ManagedAddress) -> SCResult<(u64)> {
+	fn buy(&self, token_id: u64,dealer_addr:ManagedAddress) -> SCResult<u64> {
 		let (payment, _pay_token)=self.call_value().payment_token_pair();
 
 		let idx_dealer=self.get_idx_dealer(self.get_idx_addresses(&dealer_addr));
@@ -928,7 +925,7 @@ pub trait ENonFungibleTokens
 
 		//On retrouve le distributeur du token
 		let dealer:Dealer=self.dealers_map().get(idx_dealer);
-		let (mark_up,max_markup)=dealer.find_markup(token_id);
+		let (mark_up,_max_markup)=dealer.find_markup(token_id);
 		let mut payment_for_dealer=CONVERT_TO_GAS*(mark_up as u64);
 
 		require!(token.properties & DIRECT_SELL>0 || !dealer.is_zero() ,"E31: La vente directe n'est pas autorisé");
@@ -965,7 +962,7 @@ pub trait ENonFungibleTokens
 		token.owner=idx_caller; //On change le propriétaire
 		self.tokens_map().set(token_id as usize,&token);
 
-		return Ok((token_id));
+		return Ok(token_id);
 	}
 
 
