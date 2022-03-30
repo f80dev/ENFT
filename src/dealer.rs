@@ -1,10 +1,11 @@
-use elrond_wasm::{
-     types::{Vec}
-};
+
 
 use crate::{NOT_FIND, ZERO_ADDR};
 
 elrond_wasm::derive_imports!();
+
+use elrond_wasm::types::heap::Vec;
+
 
 // pub fn build_dealer(dealer_addr: u64) -> Dealer {
 //      return Dealer {

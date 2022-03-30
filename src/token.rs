@@ -1,6 +1,4 @@
-use elrond_wasm::{
-     types::{Vec},
-};
+use elrond_wasm::types::heap::Vec;
 use crate::ZERO_ADDR;
 
 elrond_wasm::derive_imports!();

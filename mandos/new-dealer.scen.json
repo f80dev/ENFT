@@ -167,7 +167,7 @@
         "gasPrice": "0"
       },
       "expect": {
-        "out": ["0x000000a0000a000b000000040000006645474c447061756c5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f014007000000000001ffffffffffffffff00007061756c5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f7061756c5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f0000000000000002636f6c6c656374696f6e6465736372697074696f6e"],
+        "out": ["*"],
         "status": "",
         "gas": "*",
         "refund": "*"

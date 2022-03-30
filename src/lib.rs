@@ -7,6 +7,7 @@
 elrond_wasm::imports!();
 use token::Token;
 use dealer::Dealer;
+use elrond_wasm::types::heap::Vec;
 
 mod token;
 mod dealer;
@@ -61,7 +62,7 @@ pub trait ENonFungibleTokens
 	#[view(set_addresses)]
 	fn set_addresses(&self,new_addr: &ManagedAddress) -> u64 {
 		let rc=self.addresses();
-		let mut idx =rc.load_as_vec().iter().position(|r| r==new_addr).unwrap_or(NOT_FIND);
+		let mut idx =rc.iter().position(|r| r.eq(new_addr)).unwrap_or(NOT_FIND);
 		if idx == NOT_FIND {
 			idx = rc.len();
 			self.addresses().push(new_addr);
@@ -75,13 +76,13 @@ pub trait ENonFungibleTokens
 	fn get_idx_token_by_desc_and_addr(&self,description: &Vec<u8>,miner:&ManagedAddress) -> u64 {
 		let idx_description=self.get_idx_str(&description) as u64;
 		let idx_miner=self.get_idx_addresses(miner);
-		let idx= self.tokens_map().load_as_vec().iter().position(|r| r.description==idx_description && r.miner == idx_miner).unwrap_or(NOT_FIND);
+		let idx= self.tokens_map().iter().position(|r| r.description==idx_description && r.miner == idx_miner).unwrap_or(NOT_FIND);
 		return idx as u64;
 	}
 
 	//Retourne vrai si le owner (idx_owner) possede un token du miner_addr et meme description
 	fn owner_has_required_token(&self,idx_owner:u64,idx_description:u64, idx_miner_addr: u64) -> bool {
-		let idx= self.tokens_map().load_as_vec().iter().position(|t| t.description==idx_description && t.miner == idx_miner_addr && t.owner==idx_owner).unwrap_or(NOT_FIND);
+		let idx= self.tokens_map().iter().position(|t| t.description==idx_description && t.miner == idx_miner_addr && t.owner==idx_owner).unwrap_or(NOT_FIND);
 		return idx != NOT_FIND;
 	}
 
@@ -92,14 +93,14 @@ pub trait ENonFungibleTokens
 
 	#[view(get_idx_addresses)]
 	fn get_idx_addresses(&self,new_addr: &ManagedAddress) -> u64 {
-		let idx= self.addresses().load_as_vec().iter().position(|r| r==new_addr).unwrap_or(NOT_FIND);
+		let idx= self.addresses().iter().position(|r| r.eq(new_addr)).unwrap_or(NOT_FIND);
 		return idx as u64;
 	}
 
 	//Retrouve l'index d'un dealer dans la liste des dealers
 	#[view(get_idx_dealer)]
 	fn get_idx_dealer(&self,idx_dealer_addr: u64) -> usize {
-		let idx= self.dealers_map().load_as_vec().iter().position(|r| r.addr==idx_dealer_addr).unwrap_or(NOT_FIND);
+		let idx= self.dealers_map().iter().position(|r| r.addr.eq(&idx_dealer_addr)).unwrap_or(NOT_FIND);
 		if idx==NOT_FIND {
 			return idx
 		} else {
@@ -115,14 +116,14 @@ pub trait ENonFungibleTokens
 
 	#[view(get_idx_str)]
 	fn get_idx_str(&self,vec: &Vec<u8>) -> usize {
-		let idx =self.strs().load_as_vec().iter().position(|r| r == vec).unwrap_or(NOT_FIND);
+		let idx =self.strs().iter().position(|r| r.eq(vec)).unwrap_or(NOT_FIND);
 		return idx;
 	}
 
 
 	fn set_str(&self,vec: &Vec<u8>) -> u64 {
 		let mut rc=self.strs();
-		let mut idx =rc.load_as_vec().iter().position(|r| r == vec).unwrap_or(NOT_FIND);
+		let mut idx =rc.iter().position(|r| r.eq(vec)).unwrap_or(NOT_FIND);
 		if idx == NOT_FIND {
 			idx = rc.len();
 			rc.push(vec);
@@ -134,7 +135,7 @@ pub trait ENonFungibleTokens
 
 	fn set_esdt(&self,new_token: &TokenIdentifier) -> u16 {
 		let mut rc=self.esdt_map();
-		let mut idx =rc.load_as_vec().iter().position(|r| r == new_token).unwrap_or(NOT_FIND);
+		let mut idx =rc.iter().position(|r| r.eq(new_token)).unwrap_or(NOT_FIND);
 		if idx == NOT_FIND {
 			idx = rc.len();
 			rc.push(&new_token);
@@ -811,7 +812,7 @@ pub trait ENonFungibleTokens
 		let mut rc=Vec::new();
 		let idx_filter_miner=self.get_idx_addresses(filter_miner);
 
-		for dealer in self.dealers_map().load_as_vec() {
+		for dealer in self.dealers_map().iter() {
 			if idx_filter_miner == ZERO_ADDR || dealer.miners.contains(&idx_filter_miner) {
 				rc.append(&mut self.dealer_to_vec(&dealer))
 			}
@@ -877,7 +878,7 @@ pub trait ENonFungibleTokens
 	fn count_by_collection(&self,owner_filter:u64,creator_filter:u64,idx_collection_filter:u64) -> u8 {
 		let mut rc=0u8;
 		let now=self.blockchain().get_block_timestamp();
-		for token in self.tokens_map().load_as_vec() {
+		for token in self.tokens_map().iter() {
 			if token.owner==owner_filter &&
 				(idx_collection_filter==token.collection || idx_collection_filter==0) &&
 				(creator_filter==token.creator || creator_filter==ZERO_ADDR) &&
@@ -969,7 +970,7 @@ pub trait ENonFungibleTokens
 
 	// fn get_dealer_addresses_for_token(&self,id_token:u64 ) -> Vec<u64> {
 	// 	let mut rc=Vec::new();
-	// 	for dealer in self.dealers_map().load_as_vec(): Vec<Dealer> {
+	// 	for dealer in self.dealers_map().iter(): Vec<Dealer> {
 	// 		if dealer.tokens.contains(&id_token){
 	// 			rc.push(dealer.addr);
 	// 			break;

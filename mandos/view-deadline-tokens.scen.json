@@ -20,14 +20,14 @@
         "gasPrice": "0"
       },
       "expect": {
-        "out": ["2"],
+        "out": ["0x01"],
         "status": "",
         "gas": "*",
         "refund": "*"
       }
     },
     {
-      "txId": "Count_by_collection pour Paul",
+      "txId": "Count_by_collection for Paul",
       "step": "scCall",
       "tx": {
         "from": "address:paul",
@@ -40,7 +40,7 @@
         "gasPrice": "0"
       },
       "expect": {
-        "out": ["2"],
+        "out": ["0x01"],
         "status": "",
         "gas": "*",
         "refund": "*"

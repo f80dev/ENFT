@@ -50,7 +50,7 @@ CHAINID="D"
 build(){
   clear
   echo "Build avec l'adresse : ${BANK}"
-  erdpy contract build --no-wasm-opt --wasm-name ./output/output.wasm
+  erdpy contract build
 }
 
 deploy() {
@@ -62,7 +62,7 @@ deploy() {
 
     echo "Déploiement"
     erdpy --verbose contract deploy --chain=${CHAINID} --project=${PROJECT} \
-          --proxy=${PROXY} --recall-nonce --pem=${BANK} --gas-limit="80000000" \
+          --proxy=${PROXY} --recall-nonce --pem=${BANK} --gas-limit="600000000" \
           --outfile="deploy.json" --send || return
 
     TRANSACTION=$(erdpy data parse --file="deploy.json" --expression="data['emitted_tx']['hash']")
